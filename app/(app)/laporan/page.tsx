@@ -26,7 +26,6 @@ function bulanOptions() {
 export default async function LaporanPage({ searchParams }: { searchParams: { bulan?: string; kelas?: string; t?: string; semua?: string } }) {
   const user = await getCurrentUser();
   const isGuru = user?.role === "GURU";
-  const isKamad = user?.role === "KEPALA";
   // Absensi belum jadi absensi resmi madrasah — rekap kehadiran hanya tampil
   // untuk Guru (catatan kelas sendiri) dan Admin. Kamad & Waka tidak melihatnya.
   const bisaAbsensi = isGuru || ["ADMIN", "SUPERADMIN"].includes(user?.role ?? "");
