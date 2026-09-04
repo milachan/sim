@@ -42,6 +42,18 @@ for (const dir of fs.readdirSync(MIG)) {
       return full;
     }
   );
+  // CREATE INDEX ... ON `namaTabel`(...)
+  sql = sql.replace(
+    /((?:CREATE|UNIQUE|INDEX|KEY)[^;]*?\bON\s+)`([a-zA-Z_][a-zA-Z0-9_]*)`/g,
+    (full, prefix, name) => {
+      const fixed = lowerToActual.get(name.toLowerCase());
+      if (fixed && fixed !== name) {
+        totalChanges++;
+        return `${prefix}\`${fixed}\``;
+      }
+      return full;
+    }
+  );
   if (sql !== before) fs.writeFileSync(f, sql);
 }
 console.log("Nama tabel unik:", actual.size);
