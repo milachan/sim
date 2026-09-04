@@ -1,0 +1,734 @@
+// Sistem Administrasi Pembelajaran Guru
+// Schema sesuai blueprint: Jurnal • Absensi • Penilaian — terintegrasi Jadwal Mengajar
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  GURU
+  WAKA
+  ADMIN
+  SUPERADMIN
+  KEPALA
+}
+
+enum StatusSiswa {
+  AKTIF
+  ALUMNI
+  KELUAR
+}
+
+enum Hari {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+}
+
+enum StatusAbsensi {
+  HADIR
+  SAKIT
+  IZIN
+  ALPA
+  TERLAMBAT
+  DISPENSASI
+}
+
+// Jenis guru: BIASA = guru reguler, PIKET = backup absensi harian bila guru jam
+// pertama belum mengisi, WALI_KELAS = wali kelas rombel, BK = bimbingan konseling
+// (bisa dijadwalkan seperti mapel dan punya halaman khusus). Diatur di Data Guru.
+enum JenisGuru {
+  BIASA
+  PIKET
+  WALI_KELAS
+  BK
+}
+
+// Peran pengisi absensi harian kelas: guru jam pertama (pengisi utama), guru
+// piket (backup), atau wali kelas (berhak mengubah kelas yang diwalikannya).
+// Menentukan status tampilan per kelas per hari.
+enum PeranPengisiAbsensi {
+  GURU_JAM_PERTAMA
+  GURU_PIKET
+  WALI_KELAS
+}
+
+enum SumberPertemuan {
+  OTOMATIS
+  MANUAL
+}
+
+enum StatusPertemuan {
+  BELUM_DIMULAI
+  ABSENSI_TERISI
+  JURNAL_TERISI
+  LENGKAP
+  TIDAK_TERLAKSANA
+}
+
+enum StatusJurnal {
+  DRAFT
+  TERKIRIM
+}
+
+// Kejadian siswa selama pelajaran — pendukung jurnal, TIDAK mengubah absensi
+// harian resmi (struktur absensi dipertahankan untuk pengembangan ke depan).
+enum JenisKejadian {
+  TERLAMBAT
+  IZIN_KELUAR
+  TIDAK_DI_KELAS
+  SAKIT
+  PULANG
+  LAINNYA
+}
+
+enum JenisKegiatan {
+  TUGAS
+  KUIS
+  ULANGAN_HARIAN
+  PRAKTIK
+  PROYEK
+  PRESENTASI
+  PORTOFOLIO
+  PTS
+  PAS
+  REMEDIAL
+  PENGAYAAN
+}
+
+enum StatusKumpul {
+  DIKUMPULKAN
+  BELUM
+  TERLAMBAT
+}
+
+// ============ ENUMS KHUSUS RUMAH ADMINISTRASI ============
+// Alur dokumen administrasi — terisolasi dari StatusLaporan / StatusJurnal
+enum JenisDokumen {
+  PROPOSAL
+  RPP_MODUL_AJAR
+  LAPORAN_KEGIATAN
+  DOKUMEN_UMUM
+}
+
+enum StatusDokumen {
+  DRAF
+  DIKIRIM
+  PERLU_REVISI
+  DISETUJUI
+  DIFINALKAN
+  DIARSIPKAN
+}
+
+// Alur laporan bulanan: DRAFT (dibuat) -> DIPERIKSA (disampling Waka) -> DISETUJUI (disetujui Kamad)
+enum StatusLaporan {
+  DRAFT
+  DIPERIKSA
+  DISETUJUI
+}
+
+// ============ MASTER DATA ============
+
+model Sekolah {
+  id      String  @id @default(cuid())
+  nama    String
+  npsn    String?
+  alamat  String?
+  telepon String?
+  email   String?
+}
+
+model User {
+  id                 String                  @id @default(cuid())
+  username           String                  @unique
+  password           String
+  nama               String
+  role               Role                    @default(GURU)
+  aktif              Boolean                 @default(true)
+  wajibGantiPassword Boolean                 @default(false)
+  guruId             String?                 @unique
+  guru               Guru?                   @relation(fields: [guruId], references: [id])
+  riwayat            RiwayatPerubahan[]
+  pertemuan          Pertemuan[]
+  pushSubscriptions  PushSubscription[]
+  riwayatPush        RiwayatPush[]
+  notifikasiDokumen  NotifikasiAdministrasi[]
+  laporanDibuat      LaporanBulanan[]        @relation("LaporanDibuatOleh")
+  laporanDiperiksa   LaporanBulanan[]        @relation("LaporanDiperiksaOleh")
+  laporanDisetujui   LaporanBulanan[]        @relation("LaporanDisetujuiOleh")
+  catatanKejadian    CatatanKejadian[]
+  absensiHarian      AbsensiHarian[]
+  passwordRequests   PasswordChangeRequest[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+}
+
+model Guru {
+  id          String             @id @default(cuid())
+  nama        String
+  kode        String?            @unique // kode guru dari file jadwal (mis. "K5") — kunci sinkronisasi import
+  nip         String?            @unique
+  telepon     String? // Nomor WhatsApp untuk notifikasi (format 08xx)
+  status      Boolean            @default(true)
+  jenisGuru   JenisGuru          @default(BIASA)
+  deletedAt   DateTime?
+  user        User?
+  waliKelas   Kelas[]
+  waliRiwayat WaliKelasRiwayat[]
+  mapelDiampu MataPelajaran[]
+  jadwal      Jadwal[]
+}
+
+model Siswa {
+  id            String              @id @default(cuid())
+  nama          String
+  // NISN = kunci sinkron import data siswa (10 digit). NIS tetap dipertahankan
+  // sebagai identitas lokal; NISN menjadi patokan pencocokan saat upload Excel.
+  nisn          String?             @unique
+  nis           String?             @unique
+  kelasId       String?
+  kelas         Kelas?              @relation(fields: [kelasId], references: [id], onDelete: SetNull)
+  status        StatusSiswa         @default(AKTIF)
+  deletedAt     DateTime?
+  absensi       AbsensiItem[]
+  absensiHarian AbsensiHarianItem[]
+  nilai         NilaiSiswa[]
+  kejadian      CatatanKejadian[]
+
+  @@index([kelasId, status])
+}
+
+model Kelas {
+  id            String             @id @default(cuid())
+  nama          String             @unique
+  tingkat       Int
+  waliKelasId   String?
+  waliKelas     Guru?              @relation(fields: [waliKelasId], references: [id], onDelete: SetNull)
+  waliRiwayat   WaliKelasRiwayat[]
+  siswa         Siswa[]
+  jadwal        Jadwal[]
+  pertemuan     Pertemuan[]
+  absensiHarian AbsensiHarian[]
+}
+
+model MataPelajaran {
+  id        String      @id @default(cuid())
+  nama      String
+  kode      String?
+  guru      Guru[]
+  jadwal    Jadwal[]
+  pertemuan Pertemuan[]
+}
+
+model TahunAjaran {
+  id       String             @id @default(cuid())
+  nama     String             @unique // misal: 2025/2026
+  aktif    Boolean            @default(false)
+  semester Semester[]
+  kalender KalenderAkademik[]
+}
+
+model Semester {
+  id            String             @id @default(cuid())
+  nama          String // Ganjil / Genap / Periode
+  aktif         Boolean            @default(false)
+  // Tanggal berlaku otomatis: bila diisi, semester aktif dipilih otomatis
+  // ketika tanggal berjalan berada di dalam rentang ini (untuk pergantian jadwal berkala).
+  mulai         DateTime?          @db.Date
+  selesai       DateTime?          @db.Date
+  // Soft delete (arsip): periode dihapus = disembunyikan, seluruh jadwal,
+  // pertemuan, absensi & jurnal di dalamnya tetap aman dan tetap dihitung laporan.
+  deletedAt     DateTime?
+  tahunAjaranId String
+  tahunAjaran   TahunAjaran        @relation(fields: [tahunAjaranId], references: [id], onDelete: Cascade)
+  jadwal        Jadwal[]
+  waliRiwayat   WaliKelasRiwayat[]
+}
+
+// Riwayat wali kelas per periode: siapa wali kelas suatu rombel pada periode
+// (semester) tertentu. Digunakan untuk menelusuri siapa wali kelas saat itu
+// dan siapa yang mencatat kehadiran di periode berjalan.
+model WaliKelasRiwayat {
+  id         String    @id @default(cuid())
+  kelasId    String
+  kelas      Kelas     @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  guruId     String
+  guru       Guru      @relation(fields: [guruId], references: [id], onDelete: Cascade)
+  semesterId String?
+  semester   Semester? @relation(fields: [semesterId], references: [id], onDelete: SetNull)
+  mulai      DateTime  @default(now())
+  selesai    DateTime? // null = masih aktif sebagai wali kelas
+
+  @@index([kelasId])
+  @@index([guruId])
+  @@index([semesterId])
+}
+
+// ============ JADWAL & PERTEMUAN ============
+
+model Jadwal {
+  id           String              @id @default(cuid())
+  guruId       String
+  guru         Guru                @relation(fields: [guruId], references: [id])
+  kelasId      String
+  kelas        Kelas               @relation(fields: [kelasId], references: [id])
+  mapelId      String
+  mapel        MataPelajaran       @relation(fields: [mapelId], references: [id])
+  semesterId   String
+  semester     Semester            @relation(fields: [semesterId], references: [id])
+  hari         Hari
+  jamKeMulai   Int
+  jamKeSelesai Int
+  pertemuan    Pertemuan[]
+  kegiatan     PenilaianKegiatan[]
+
+  @@index([guruId, semesterId, hari])
+  @@index([kelasId, semesterId, hari])
+}
+
+// Simpul penghubung: satu jadwal mingguan -> banyak pertemuan per tanggal
+// JadwalId null = pertemuan manual (guru pengganti, remedial di luar jadwal)
+model Pertemuan {
+  id           String            @id @default(cuid())
+  jadwalId     String?
+  jadwal       Jadwal?           @relation(fields: [jadwalId], references: [id], onDelete: Cascade)
+  kelasId      String?
+  kelas        Kelas?            @relation(fields: [kelasId], references: [id], onDelete: SetNull)
+  mapelId      String?
+  mapel        MataPelajaran?    @relation(fields: [mapelId], references: [id], onDelete: SetNull)
+  tanggal      DateTime          @db.Date
+  pertemuanKe  Int
+  status       StatusPertemuan   @default(BELUM_DIMULAI)
+  sumber       SumberPertemuan   @default(OTOMATIS)
+  alasanManual String?
+  dibuatOlehId String?
+  dibuatOleh   User?             @relation(fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+  absensi      AbsensiItem[]
+  jurnal       Jurnal?
+  kejadian     CatatanKejadian[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Tidak boleh ada dua pertemuan otomatis untuk jadwal & tanggal yang sama
+  @@unique([jadwalId, tanggal])
+  @@index([tanggal, status])
+  @@index([jadwalId, status, tanggal])
+}
+
+// ============ ABSENSI ============
+
+model AbsensiItem {
+  id          String        @id @default(cuid())
+  pertemuanId String
+  pertemuan   Pertemuan     @relation(fields: [pertemuanId], references: [id], onDelete: Cascade)
+  siswaId     String
+  siswa       Siswa         @relation(fields: [siswaId], references: [id])
+  status      StatusAbsensi @default(HADIR)
+  catatan     String?
+
+  @@unique([pertemuanId, siswaId])
+  @@index([siswaId, status])
+  @@index([pertemuanId, status])
+}
+
+// ============ ABSENSI HARIAN KELAS ============
+// Satu catatan kehadiran per kelas per hari (bukan per pertemuan). Pengisi utama
+// adalah guru jam pertama; guru piket menjadi backup saat masih kosong dan boleh
+// mengoreksi. Semua alur memakai satu data ini — tidak ada rekap ganda.
+
+model AbsensiHarian {
+  id           String              @id @default(cuid())
+  kelasId      String
+  kelas        Kelas               @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  tanggal      DateTime            @db.Date
+  pengisiId    String
+  pengisi      User                @relation(fields: [pengisiId], references: [id], onDelete: Cascade)
+  peranPengisi PeranPengisiAbsensi
+  item         AbsensiHarianItem[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([kelasId, tanggal])
+  @@index([tanggal, kelasId])
+  @@index([pengisiId])
+}
+
+model AbsensiHarianItem {
+  id              String        @id @default(cuid())
+  absensiHarianId String
+  absensiHarian   AbsensiHarian @relation(fields: [absensiHarianId], references: [id], onDelete: Cascade)
+  siswaId         String
+  siswa           Siswa         @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  status          StatusAbsensi
+  catatan         String?
+
+  @@unique([absensiHarianId, siswaId])
+  @@index([siswaId])
+}
+
+// ============ KEJADIAN SISWA ============
+// Catatan kejadian selama pelajaran (terlambat, izin keluar, dsb). Bersifat
+// pendukung jurnal dan TIDAK mengubah absensi harian resmi siswa.
+
+model CatatanKejadian {
+  id           String        @id @default(cuid())
+  pertemuanId  String
+  pertemuan    Pertemuan     @relation(fields: [pertemuanId], references: [id], onDelete: Cascade)
+  siswaId      String
+  siswa        Siswa         @relation(fields: [siswaId], references: [id])
+  jenis        JenisKejadian
+  keterangan   String?
+  dibuatOlehId String?
+  dibuatOleh   User?         @relation(fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+
+  @@index([pertemuanId])
+  @@index([siswaId])
+}
+
+// ============ JURNAL ============
+
+model Jurnal {
+  id             String       @id @default(cuid())
+  pertemuanId    String       @unique
+  pertemuan      Pertemuan    @relation(fields: [pertemuanId], references: [id], onDelete: Cascade)
+  materi         String?
+  tujuan         String?
+  kegiatan       String?
+  metode         String?
+  media          String?
+  hasil          String?
+  kendala        String?
+  tindakLanjut   String?
+  catatan        String?
+  dokumentasiUrl String?
+  status         StatusJurnal @default(DRAFT)
+  dibuatPada     DateTime     @default(now())
+  diubahPada     DateTime     @updatedAt
+
+  @@index([status, diubahPada])
+}
+
+// ============ PENILAIAN ============
+
+model PenilaianKegiatan {
+  id            String        @id @default(cuid())
+  jadwalId      String
+  jadwal        Jadwal        @relation(fields: [jadwalId], references: [id], onDelete: Cascade)
+  jenis         JenisKegiatan
+  judul         String
+  tanggal       DateTime      @db.Date
+  nilaiMaksimal Int           @default(100)
+  nilai         NilaiSiswa[]
+  createdAt     DateTime      @default(now())
+
+  @@index([jadwalId, tanggal])
+}
+
+model NilaiSiswa {
+  id           String            @id @default(cuid())
+  kegiatanId   String
+  kegiatan     PenilaianKegiatan @relation(fields: [kegiatanId], references: [id], onDelete: Cascade)
+  siswaId      String
+  siswa        Siswa             @relation(fields: [siswaId], references: [id])
+  nilai        Float?
+  catatan      String?
+  statusKumpul StatusKumpul      @default(BELUM)
+
+  @@unique([kegiatanId, siswaId])
+}
+
+// ============ AUDIT TRAIL & LAINNYA ============
+
+model RiwayatPerubahan {
+  id        String   @id @default(cuid())
+  entitas   String
+  entitasId String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  perubahan Json
+  waktu     DateTime @default(now())
+}
+
+model KalenderAkademik {
+  id            String       @id @default(cuid())
+  tanggal       DateTime     @db.Date
+  keterangan    String
+  tipe          String       @default("KEGIATAN") // LIBUR | KEGIATAN | UJIAN
+  tahunAjaranId String?
+  tahunAjaran   TahunAjaran? @relation(fields: [tahunAjaranId], references: [id], onDelete: SetNull)
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+// ============ LAPORAN BULANAN (verifikasi Waka -> persetujuan Kamad) ============
+
+model LaporanBulanan {
+  id              String        @id @default(cuid())
+  bulan           String        @unique // format "YYYY-MM", misal "2026-08"
+  status          StatusLaporan @default(DRAFT)
+  dibuatOlehId    String?
+  dibuatOleh      User?         @relation("LaporanDibuatOleh", fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+  diperiksaOlehId String?
+  diperiksaOleh   User?         @relation("LaporanDiperiksaOleh", fields: [diperiksaOlehId], references: [id], onDelete: SetNull)
+  disetujuiOlehId String?
+  disetujuiOleh   User?         @relation("LaporanDisetujuiOleh", fields: [disetujuiOlehId], references: [id], onDelete: SetNull)
+  catatanWaka     String? // catatan sampling Waka
+  catatanKamad    String? // catatan persetujuan Kamad
+  // Hasil sampling verifikasi per guru: [{ guruId, nama, total, lengkap, terverifikasi, catatan }]
+  sampling        Json?
+  diperiksaPada   DateTime?
+  disetujuiPada   DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// ============ NOTIFIKASI WEB PUSH (PWA) ============
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RiwayatPush {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  judul       String
+  isi         String
+  jenis       String   @default("PENGINGAT") // PENGINGAT | UJI_COBA
+  url         String?
+  tag         String?
+  sasaran     Int      @default(0) // jumlah guru yang menjadi sasaran
+  perangkat   Int      @default(0) // jumlah perangkat yang berhasil dikirimi
+  detail      Json? // [{ guru: string, jumlah: number }]
+  dikirimPada DateTime @default(now())
+}
+
+// Jadwal waktu tiap jam pelajaran per hari. Menggantikan hardcode JAM_WAKTU.
+// Setiap baris = satu jam pelajaran pada hari tertentu.
+model JamPelajaran {
+  id      String @id @default(cuid())
+  hari    Hari
+  jamKe   Int
+  mulai   String // "HH:mm"
+  selesai String // "HH:mm"
+
+  @@unique([hari, jamKe])
+  @@index([hari])
+}
+
+// Permintaan ganti password dari guru — menunggu approval admin.
+model PasswordChangeRequest {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newPaswordHash String
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  catatanAdmin   String?
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+
+  @@index([status])
+}
+
+// ============ RUMAH ADMINISTRASI (tabel baru, tanpa menyentuh model jurnal) ============
+
+model Dokumen {
+  id            String            @id @default(cuid())
+  jenis         JenisDokumen
+  judul         String
+  ringkasan     String?           @db.Text
+  status        StatusDokumen     @default(DRAF)
+  pengajuUserId String
+  pengajuGuruId String?
+  arsip         Boolean           @default(false)
+  versiAktif    Int               @default(1)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  versi         VersiDokumen[]
+  lampiran      LampiranDokumen[]
+  riwayat           RiwayatDokumen[]
+  dokumenFinal      DokumenFinal?
+  notifikasiAdmin   NotifikasiAdministrasi[]
+
+  @@index([pengajuUserId])
+  @@index([status, jenis])
+  @@index([arsip, status])
+}
+
+model VersiDokumen {
+  id                  String        @id @default(cuid())
+  dokumenId           String
+  dokumen             Dokumen       @relation(fields: [dokumenId], references: [id], onDelete: Cascade)
+  nomor               Int
+  judul               String
+  ringkasan           String?       @db.Text
+  snapshotLampiranIds Json?
+  dibuatOlehUserId    String
+  namaAsli            String?
+  mime                String?
+  ukuran              Int?
+  kunciPenyimpanan    String?
+  sha256              String?
+  createdAt           DateTime      @default(now())
+  dokumenFinal        DokumenFinal?
+
+  @@unique([dokumenId, nomor])
+  @@index([dokumenId])
+}
+
+model LampiranDokumen {
+  id                 String   @id @default(cuid())
+  dokumenId          String
+  dokumen            Dokumen  @relation(fields: [dokumenId], references: [id], onDelete: Cascade)
+  namaAsli           String
+  mime               String
+  ukuran             Int
+  kunciPenyimpanan   String
+  sha256             String
+  diunggahOlehUserId String
+  createdAt          DateTime @default(now())
+
+  @@index([dokumenId])
+}
+
+model RiwayatDokumen {
+  id          String   @id @default(cuid())
+  dokumenId   String
+  dokumen     Dokumen  @relation(fields: [dokumenId], references: [id], onDelete: Cascade)
+  aktorUserId String?
+  aksi        String
+  dariStatus  String?
+  keStatus    String?
+  payload     Json?
+  waktu       DateTime @default(now())
+
+  @@index([dokumenId, waktu])
+}
+
+// Bukti finalisasi dokumen Administrasi: satu dokumen hanya boleh memiliki
+// satu record final (dokumenId unique). kodeVerifikasi acak berentropi tinggi,
+// tanpa userId/path/storage key/checksum lengkap. Additive terhadap model jurnal.
+model DokumenFinal {
+  id               String       @id @default(cuid())
+  dokumenId        String       @unique
+  dokumen          Dokumen      @relation(fields: [dokumenId], references: [id], onDelete: Cascade)
+  versiId          String
+  versi            VersiDokumen @relation(fields: [versiId], references: [id], onDelete: Restrict)
+  nomorVersi       Int
+  sha256           String
+  ukuran           Int
+  mime             String
+  namaAsli         String
+  kodeVerifikasi   String       @unique
+  difinalkanOlehId String
+  difinalkanPada   DateTime     @default(now())
+  createdAt        DateTime     @default(now())
+
+  @@unique([versiId])
+}
+
+// ============================================================
+// Template Dokumen (Rumah Administrasi) — additive.
+// Template resmi per jenis dokumen; versi immutable per unggahan.
+// Tidak menyentuh model Jurnal/Pertemuan/Jadwal/Nilai.
+// ============================================================
+
+model TemplateDokumen {
+  id               String                   @id @default(cuid())
+  jenis            JenisDokumen
+  nama             String
+  deskripsi        String?                  @db.Text
+  aktif            Boolean                  @default(false)
+  dibuatOlehId     String
+  diperbaruiOlehId String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  versi            VersiTemplateDokumen[]
+
+  @@index([jenis, aktif])
+}
+
+model VersiTemplateDokumen {
+  id               String          @id @default(cuid())
+  templateId       String
+  template         TemplateDokumen @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  nomor            Int
+  namaAsli         String
+  mime             String
+  ukuran           Int
+  kunciPenyimpanan String
+  sha256           String
+  dibuatOlehId     String
+  createdAt        DateTime        @default(now())
+
+  @@unique([templateId, nomor])
+}
+
+// Audit aktivitas template — terpisah dari RiwayatDokumen pengajuan
+// karena semantiknya berbeda (pengelolaan admin, bukan alur dokumen guru).
+model RiwayatTemplateDokumen {
+  id           String   @id @default(cuid())
+  templateId   String
+  aksi         String
+  payload      Json?
+  aktorUserId  String
+  createdAt    DateTime @default(now())
+
+  @@index([templateId, createdAt])
+}
+
+// ============================================================
+// Notifikasi backend alur Dokumen Administrasi — additive.
+// Dibuat dalam transaksi yang sama dengan perubahan status dokumen.
+// eventKey = id RiwayatDokumen sumber → deduplication per penerima+event.
+// isi hanya teks ringkas: tanpa storage key/path/checksum/catatan revisi.
+// Tidak menyentuh model Jurnal/Push/WhatsApp/email.
+// ============================================================
+
+enum JenisNotifikasiAdministrasi {
+  DOKUMEN_DIKIRIM
+  REVISI_DIKIRIM
+  PERLU_REVISI
+  DISETUJUI
+  DIFINALKAN
+}
+
+model NotifikasiAdministrasi {
+  id             String                        @id @default(cuid())
+  penerimaUserId String
+  penerima       User                          @relation(fields: [penerimaUserId], references: [id], onDelete: Cascade)
+  dokumenId      String
+  dokumen        Dokumen                       @relation(fields: [dokumenId], references: [id], onDelete: Cascade)
+  jenis          JenisNotifikasiAdministrasi
+  judul          String
+  isi            String                        @db.VarChar(400)
+  eventKey       String
+  dibacaPada     DateTime?
+  createdAt      DateTime                      @default(now())
+
+  @@unique([penerimaUserId, eventKey])
+  @@index([penerimaUserId, dibacaPada, createdAt])
+}

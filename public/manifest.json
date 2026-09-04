@@ -1,0 +1,58 @@
+{
+  "id": "/",
+  "name": "Sistem Administrasi Guru — MTsN 2 Kebumen",
+  "short_name": "Sistem Guru",
+  "description": "Jurnal, Absensi, dan Penilaian terintegrasi dengan jadwal mengajar. Aplikasi administrasi pembelajaran guru.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#047857",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Jurnal Baru",
+      "short_name": "Jurnal Baru",
+      "description": "Buat jurnal manual (guru pengganti / remedial)",
+      "url": "/jurnal/baru",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Jadwal Saya",
+      "short_name": "Jadwal",
+      "description": "Lihat jadwal mengajar",
+      "url": "/jadwal",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Laporan & Ekspor",
+      "short_name": "Laporan",
+      "description": "Unduh laporan jurnal, absensi, dan kelengkapan",
+      "url": "/laporan",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

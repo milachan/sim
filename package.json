@@ -6,21 +6,39 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test lib/account-auth.test.ts lib/otorisasi.test.ts lib/hari.test.ts lib/pertemuan.test.ts lib/semester-wali.test.ts lib/laporan.test.ts lib/audit-jurnal.test.ts lib/status.test.ts lib/absensi-harian.test.ts lib/nav.test.ts lib/jadwal-validasi.test.ts components/charts.test.ts lib/akun-provision.test.ts lib/health.test.ts lib/user-validasi.test.ts lib/import-guru-parse.test.ts lib/peran-pengisi.test.ts lib/kredensial.test.ts lib/env-check.test.ts lib/tahap-2-5b-regression.test.ts lib/import-jadwal.test.ts lib/import-jadwal.b2-regression.test.ts lib/kolom-jadwal.test.ts lib/workspace-config.test.ts lib/dokumen.test.ts lib/guard-buat-dokumen.test.ts lib/administrasi/route-guard.test.ts lib/administrasi/actions-guard.test.ts lib/administrasi/api-upload-guard.test.ts lib/administrasi/detail-readonly.test.ts lib/administrasi.test.ts lib/administrasi/upload-ui.test.ts lib/administrasi/dashboard.test.ts lib/administrasi/pemeriksaan.test.ts lib/administrasi/arsip.test.ts lib/design-system.test.ts lib/ds-components.test.ts lib/finalisasi.test.ts lib/finalisasi-db.test.ts lib/persetujuan-pdf.test.ts lib/notifikasi-db.test.ts lib/judul-batas.test.ts lib/verifikasi.test.ts lib/qr-verifikasi.test.ts lib/administrasi/template.test.ts lib/template-db.test.ts lib/template-ui.test.ts lib/verifikasi-db.test.ts lib/notifikasi-db.test.ts lib/administrasi/notifikasi.test.ts lib/administrasi/notifikasi-ui.test.ts lib/administrasi/nav.test.ts lib/analisis-nilai/statistik.test.ts lib/analisis-nilai/scope.test.ts lib/analisis-nilai/halaman.test.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^1.28.0",
+    "next": "14.2.35",
+    "next-auth": "^4.24.15",
+    "prisma": "^5.22.0",
+    "qrcode": "^1.5.4",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.35"
+    "tailwind-merge": "^3.6.0",
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35"
+    "tsx": "^4.23.9",
+    "typescript": "^5"
   }
 }

@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { kirimPengingatWhatsApp } from "@/lib/wa";
+import { apiAktif } from "@/lib/api-auth";
+import { cronBearerValid } from "@/lib/account-auth";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Akses: admin/superadmin lewat sesi (user TERBARU dari DB), ATAU cron/job
+ * terjadwal dengan header `Authorization: Bearer <PUSH_CRON_SECRET>` (dipakai
+ * juga oleh reminder WhatsApp agar satu jadwal cron cukup memanggil dua endpoint).
+ * Role JWT tidak dipakai sebagai otorisasi.
+ */
+export async function GET(req: NextRequest) {
+  return jalankan(req);
+}
+
+export async function POST(req: NextRequest) {
+  return jalankan(req);
+}
+
+async function jalankan(req: NextRequest) {
+  const authSecret = process.env.PUSH_CRON_SECRET;
+  const viaCron = cronBearerValid(req.headers.get("authorization"), authSecret);
+
+  let userId: string | undefined;
+  if (!viaCron) {
+    const auth = await apiAktif(["ADMIN", "SUPERADMIN"] as const);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    userId = auth.user.id;
+  }
+
+  const hasil = await kirimPengingatWhatsApp({
+    paksa: req.nextUrl.searchParams.get("force") === "1",
+    testOnly: req.nextUrl.searchParams.get("test") === "1",
+    userId,
+  });
+  return NextResponse.json(hasil);
+}

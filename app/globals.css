@@ -3,25 +3,347 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ============================================================
+     COMPATIBILITY ALIASES — variabel lama, nilai lama dipertahankan.
+     Halaman existing masih boleh memakai ini; migrasi bertahap.
+     ============================================================ */
+  --background: 214 32% 97%;
+  --foreground: 222 47% 11%;
+  --primary: 221 83% 37%;
+  --primary-soft: 214 95% 93%;
+  --surface: 0 0% 100%;
+  --surface-muted: 214 32% 95%;
+  --border: 214 24% 88%;
+  --muted: 215 16% 47%;
+
+  /* ============================================================
+     1. PRIMITIVE — palet dasar (HSL triplet), spacing, radius,
+        shadow, duration. Tidak dipakai langsung di komponen.
+     ============================================================ */
+  /* Slate */
+  --p-slate-50: 210 40% 98%;
+  --p-slate-100: 210 40% 96%;
+  --p-slate-200: 214 32% 91%;
+  --p-slate-300: 213 27% 84%;
+  --p-slate-400: 215 20% 65%;
+  --p-slate-500: 215 16% 47%;
+  --p-slate-600: 215 19% 35%;
+  --p-slate-700: 215 25% 27%;
+  --p-slate-800: 217 33% 17%;
+  --p-slate-900: 222 47% 11%;
+  /* Blue */
+  --p-blue-50: 214 100% 97%;
+  --p-blue-100: 214 95% 93%;
+  --p-blue-200: 214 100% 87%;
+  --p-blue-600: 221 83% 53%;
+  --p-blue-700: 224 76% 48%;
+  --p-blue-800: 224 71% 40%;
+  --p-blue-900: 224 64% 33%;
+  /* Emerald */
+  --p-emerald-50: 152 81% 96%;
+  --p-emerald-100: 149 88% 90%;
+  --p-emerald-200: 152 76% 80%;
+  --p-emerald-600: 161 94% 30%;
+  --p-emerald-700: 162 93% 24%;
+  /* Amber */
+  --p-amber-50: 48 100% 97%;
+  --p-amber-100: 48 96% 89%;
+  --p-amber-200: 48 96% 77%;
+  --p-amber-500: 38 92% 50%;
+  --p-amber-600: 32 95% 44%;
+  --p-amber-700: 27 94% 37%;
+  --p-amber-800: 27 87% 32%;
+  /* Violet */
+  --p-violet-50: 250 100% 98%;
+  --p-violet-100: 251 91% 95%;
+  --p-violet-200: 251 91% 92%;
+  --p-violet-600: 262 83% 58%;
+  --p-violet-700: 263 70% 50%;
+  --p-violet-900: 263 69% 35%;
+  /* Rose */
+  --p-rose-50: 352 100% 97%;
+  --p-rose-100: 352 100% 95%;
+  --p-rose-600: 347 77% 50%;
+  --p-rose-700: 347 75% 41%;
+  /* Spacing (4/8px) */
+  --p-space-1: 0.25rem;
+  --p-space-2: 0.5rem;
+  --p-space-3: 0.75rem;
+  --p-space-4: 1rem;
+  --p-space-5: 1.25rem;
+  --p-space-6: 1.5rem;
+  --p-space-8: 2rem;
+  /* Radius */
+  --p-radius-sm: 0.5rem;
+  --p-radius-md: 0.75rem;
+  --p-radius-lg: 0.85rem;
+  --p-radius-xl: 1.15rem;
+  --p-radius-full: 9999px;
+  /* Shadow */
+  --p-shadow-card: 0 14px 36px -28px rgba(15, 23, 42, 0.55);
+  --p-shadow-topbar: 0 8px 24px -24px rgba(15, 23, 42, 0.8);
+  /* Duration */
+  --p-duration-fast: 150ms;
+  --p-duration-normal: 200ms;
+  --p-duration-slow: 300ms;
+
+  /* ============================================================
+     2. SEMANTIC — makna, bukan warna mentah. Nama yang sudah ada
+        sebelumnya (--background, --border, --primary, dst) dipakai
+        ulang dengan nilai lama sebagai alias kompatibilitas.
+        Status (success, warning, destructive, info) GLOBAL:
+        tidak berubah per rumah.
+     ============================================================ */
+  --muted-foreground: 215 16% 47%;
+  --primary-hover: 224 71% 40%;
+  --focus-ring: 221 83% 53%;
+  --success: 162 93% 24%;
+  --success-soft: 141 84% 93%;
+  --warning: 27 94% 37%;
+  --warning-soft: 48 96% 89%;
+  --destructive: 347 75% 41%;
+  --destructive-soft: 350 94% 94%;
+  --info: 221 83% 53%;
+  --info-soft: 214 95% 93%;
+
+  /* ============================================================
+     3. COMPONENT — komposisi token untuk pola berulang.
+     ============================================================ */
+  /* Card */
+  --card-bg: 0 0% 100%;
+  --card-border: 214 32% 91%;
+  --card-shadow: var(--p-shadow-card);
+  --card-radius: var(--p-radius-xl);
+  /* Control (button/input) */
+  --control-radius: var(--p-radius-lg);
+  --input-bg: 0 0% 100%;
+  --input-border: 213 27% 84%;
+  --input-focus: var(--focus-ring);
+  /* Shell */
+  --shell-sidebar-w: 16rem;
+  --shell-header-h: 3.5rem;
+  --shell-scrim: 15 23% 12%;
+  --page-max-w: 64rem;
+  --page-pad-x: var(--p-space-4);
+  --page-pad-y: var(--p-space-6);
+  /* Navigasi */
+  --nav-active-bg: var(--p-blue-50);
+  --nav-hover-bg: 210 40% 96%;
+
+  /* ============================================================
+     WORKSPACE ACCENT — identitas rumah. Default: Jurnal (biru).
+     Hanya aksen workspace; token status TIDAK di-override di sini
+     maupun di scope [data-workspace] manapun.
+     ============================================================ */
+  --workspace-accent-rgb: var(--p-blue-700);
+  --workspace-accent-hover-rgb: var(--p-blue-800);
+  --workspace-accent-soft-rgb: var(--p-blue-100);
+  --workspace-accent-foreground-rgb: var(--p-blue-900);
+  --workspace-accent-border-rgb: var(--p-blue-200);
+  --workspace-accent-ring-rgb: var(--p-blue-600);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Convenience (warna solid) — memakai primitive HSL via hsl(var()) */
+:root {
+  --workspace-accent: hsl(var(--workspace-accent-rgb));
+  --workspace-accent-hover: hsl(var(--workspace-accent-hover-rgb));
+  --workspace-accent-soft: hsl(var(--workspace-accent-soft-rgb));
+  --workspace-accent-foreground: hsl(var(--workspace-accent-foreground-rgb));
+  --workspace-accent-border: hsl(var(--workspace-accent-border-rgb));
+  --workspace-accent-ring: hsl(var(--workspace-accent-ring-rgb));
+}
+
+/* Rumah Administrasi — aksen amber */
+[data-workspace="administrasi"] {
+  --workspace-accent-rgb: var(--p-amber-600);
+  --workspace-accent-hover-rgb: var(--p-amber-700);
+  --workspace-accent-soft-rgb: var(--p-amber-100);
+  --workspace-accent-foreground-rgb: var(--p-amber-800);
+  --workspace-accent-border-rgb: var(--p-amber-200);
+  --workspace-accent-ring-rgb: var(--p-amber-600);
+}
+
+/* Rumah Analisis Nilai — aksen violet */
+[data-workspace="analisis-nilai"] {
+  --workspace-accent-rgb: var(--p-violet-600);
+  --workspace-accent-hover-rgb: var(--p-violet-700);
+  --workspace-accent-soft-rgb: var(--p-violet-100);
+  --workspace-accent-foreground-rgb: var(--p-violet-900);
+  --workspace-accent-border-rgb: var(--p-violet-200);
+  --workspace-accent-ring-rgb: var(--p-violet-600);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply min-h-screen bg-slate-50 text-slate-800 antialiased;
+  background-image: radial-gradient(circle at 100% 0%, rgba(219, 234, 254, 0.42), transparent 28rem);
+  font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/GeistVF.woff") format("woff");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMonoVF.woff") format("woff");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+::selection {
+  background: rgb(191 219 254);
+  color: rgb(15 23 42);
+}
+
+*:focus-visible {
+  outline: 2px solid hsl(var(--focus-ring));
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-[var(--card-radius)] border border-[hsl(var(--card-border)/0.8)] bg-[hsl(var(--card-bg))] shadow-[var(--card-shadow)];
+  }
+  .card-pad {
+    @apply p-4 sm:p-5;
+  }
+  .input {
+    @apply min-h-11 w-full rounded-[var(--control-radius)] border border-[hsl(var(--input-border)/0.9)] bg-[hsl(var(--input-bg))] px-3.5 py-2.5 text-sm text-slate-800 shadow-sm transition
+      placeholder:text-slate-400 hover:border-slate-400
+      focus:border-[hsl(var(--input-focus))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--input-focus)/0.2)]
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-slate-800;
+  }
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--control-radius)] px-4 py-2.5 text-sm font-semibold
+      transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+      disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.985];
+  }
+  .btn-primary {
+    @apply btn bg-blue-700 text-white shadow-sm shadow-blue-900/10 hover:bg-blue-800
+      focus-visible:ring-blue-600 active:bg-blue-900;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm shadow-slate-900/5 hover:border-slate-400 hover:bg-slate-50
+      focus-visible:ring-slate-500;
+  }
+  .btn-danger {
+    @apply btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 focus-visible:ring-rose-500;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-500;
+  }
+  .btn-sm {
+    @apply min-h-9 rounded-lg px-3 py-1.5 text-xs;
+  }
+  .btn-lg {
+    @apply px-6 py-3.5 text-base rounded-xl;
+  }
+  .th {
+    @apply px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-600;
+  }
+  .td {
+    @apply px-3 py-3.5 text-sm text-slate-700;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+  .app-sidebar {
+    background: linear-gradient(160deg, rgb(15 39 68) 0%, rgb(20 54 91) 58%, rgb(15 49 73) 100%);
+  }
+  .app-topbar {
+    @apply border-[hsl(var(--card-border)/0.8)] bg-[hsl(var(--surface)/0.9)] shadow-[var(--p-shadow-topbar)];
+  }
+  .safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+}
+
+/* Scrollbar halus */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}
+
+/* Animasi halus */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fade-up 0.22s ease-out both;
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Styling khusus tanggal input */
+input[type="date"] {
+  min-height: 42px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mode cetak — untuk ekspor PDF via browser */
+@media print {
+  body {
+    background: white !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .app-sidebar,
+  aside[class*="sidebar"] {
+    display: none !important;
+  }
+  .print-area {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  main {
+    padding: 0 !important;
   }
 }

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `guru` ADD COLUMN `jenisGuru` ENUM('BIASA', 'PIKET', 'WALI_KELAS', 'BK') NOT NULL DEFAULT 'BIASA';

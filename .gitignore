@@ -13,6 +13,9 @@
 /.next/
 /out/
 
+# uploads foto dokumentasi
+/public/uploads/
+
 # production
 /build
 
@@ -20,13 +23,16 @@
 .DS_Store
 *.pem
 
-# debug
+# debug & cache
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.eslintcache
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -34,3 +40,30 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/backups/
+
+# penyimpanan privat Rumah Administrasi (di luar public)
+# direktori default: storage/dokumen — jangan commit file upload
+/storage/dokumen/
+.storage/
+.data/administrasi/
+
+# file cookie/sesi browser (kredensial — JANGAN commit)
+cjl*.txt
+*cookies*.txt
+
+# --- Folder / berkas NON-aplikasi: tidak ikut deploy/repo ---
+/ponytail/
+/AuditGame/
+/prepared_demo/
+/query
+/contoh_jadwal/
+/image/
+/docs/
+/.agents/
+/.commandcode/
+/.kilo/
+/.kilocode/
+/blueprint-sistem-administrasi-guru.md
+/storage/template/
