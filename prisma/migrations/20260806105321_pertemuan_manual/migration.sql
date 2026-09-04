@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `pertemuan` ADD COLUMN `kelasId` VARCHAR(191) NULL,
+ALTER TABLE `Pertemuan` ADD COLUMN `kelasId` VARCHAR(191) NULL,
     ADD COLUMN `mapelId` VARCHAR(191) NULL,
     MODIFY `jadwalId` VARCHAR(191) NULL;
 
