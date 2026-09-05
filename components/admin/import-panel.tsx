@@ -547,7 +547,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                         <ul className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
                           {hasil.guruBedaNama.slice(0, 8).map((g, i) => (
                             <li key={i} className="font-semibold">
-                              Baris {g.barisKe}: "{g.nama}" ({g.kode}) → dipakai: {g.namaDb}
+                              Baris {g.barisKe}: &ldquo;{g.nama}&rdquo; ({g.kode}) → dipakai: {g.namaDb}
                             </li>
                           ))}
                           {hasil.guruBedaNama.length > 8 && <li>… dan {hasil.guruBedaNama.length - 8} lainnya.</li>}
