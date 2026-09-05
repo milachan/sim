@@ -64,6 +64,8 @@ export type JadwalImportPlan = {
   jadwalSebelumnya: number;
   guruTidakDitemukan: GuruTidakDitemukanItem[];
   guruBedaNama: GuruBedaNamaItem[];
+  /** True bila ada baris yang kodenya cocok tapi nama di file beda total dari pemilik kode — butuh konfirmasi admin. */
+  perluKonfirmasiKode: boolean;
   guruCocokNama: GuruCocokNamaItem[];
   barisJadwal: BarisJadwalItem[];
   guruCatatan: string[];
@@ -106,7 +108,7 @@ export async function importJadwalBaru(
   semester: { id: string; nama: string },
   format: "terpisah" | "gabung",
   mode: "preview" | "exec",
-  deps?: { prismaClient?: JadwalImportPrisma }
+  deps?: { prismaClient?: JadwalImportPrisma; konfirmasiKodeBedaNama?: boolean }
 ): Promise<JadwalImportPlan> {
   const db = (deps?.prismaClient ?? (defaultPrisma as unknown as JadwalImportPrisma));
 
@@ -146,6 +148,7 @@ export async function importJadwalBaru(
     jadwalSebelumnya: jadwalDb.length,
     guruTidakDitemukan: [],
     guruBedaNama: [],
+    perluKonfirmasiKode: false,
     guruCocokNama: [],
     barisJadwal: [],
     guruCatatan: [],
@@ -219,17 +222,15 @@ export async function importJadwalBaru(
     if (byKode) {
       if (byKode.nama !== nama && kode) {
         // Nama di file yang beda format (gelar, dll.) hanya dicatat. Nama yang
-        // BEDA TOTAL dari pemilik kode = tabrakan data: jadwal tidak boleh
-        // diam-diam menempel ke guru lain → baris diblokir.
+        // BEDA TOTAL dari pemilik kode = perlu konfirmasi: jadwal TETAP dibuat
+        // memakai guru dari kode (nama di file diabaikan, nama data guru yang
+        // dipakai), tapi import terkunci sampai admin menegaskan kode benar.
         if (namaGuruMirip(nama, byKode.nama)) {
           const catatan = `${kode}: "${nama}" (DB: "${byKode.nama}")`;
           if (!plan.guruCatatan.includes(catatan)) plan.guruCatatan.push(catatan);
         } else {
           plan.guruBedaNama.push({ barisKe, nama, kode, namaDb: byKode.nama });
-          plan.error.push(
-            `Baris ${barisKe} — Kode ${kode} di file tertulis untuk "${nama}" tapi di database milik "${byKode.nama}". Perbaiki kode/nama di file — jadwal untuk baris ini tidak dibuat.`
-          );
-          return null;
+          plan.perluKonfirmasiKode = true;
         }
       }
       return byKode;
@@ -426,7 +427,11 @@ export async function importJadwalBaru(
     }
   }
 
-  plan.siapEksekusi = plan.error.length === 0 && plan.guruTidakDitemukan.length === 0 && plan.duplikatNama.length === 0;
+  plan.siapEksekusi =
+    plan.error.length === 0 &&
+    plan.guruTidakDitemukan.length === 0 &&
+    plan.duplikatNama.length === 0 &&
+    (plan.guruBedaNama.length === 0 || !!deps?.konfirmasiKodeBedaNama);
 
   return plan;
 }

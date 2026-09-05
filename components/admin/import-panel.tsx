@@ -68,6 +68,7 @@ type Hasil = {
   guruBaru?: string[];
   guruTidakDitemukan?: { barisKe: number; nama: string; kode: string | null }[];
   guruBedaNama?: { barisKe: number; nama: string; kode: string; namaDb: string }[];
+  perluKonfirmasiKode?: boolean;
   guruCocokNama?: { barisKe: number; nama: string; kodeFile: string | null; namaDb: string; kodeDb: string | null }[];
   barisJadwal?: { barisKe: number; teks: string; status: "baru" | "wali" | "cocok" | "bentrok" | "dilewati" | "blokir" }[];
   guruCatatan?: string[];
@@ -113,6 +114,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
   const [hasil, setHasil] = useState<Hasil | null>(null);
   const [bukaDetail, setBukaDetail] = useState(false);
   const [bukaBaris, setBukaBaris] = useState(false);
+  const [konfirmKode, setKonfirmKode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const meta = TIPE[tipe];
@@ -182,15 +184,24 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
       };
     }
     if (h.preview) {
+      const blokirNyata =
+        (h.guruTidakDitemukan?.length ?? 0) + (h.duplikatNama?.length ?? 0) + (h.bentrok ?? 0);
+      // Satu-satunya penghalang = kode-vs-nama yang butuh konfirmasi admin (bukan error).
+      if (h.perluKonfirmasiKode && h.siapEksekusi !== true && blokirNyata === 0) {
+        return {
+          cls: "border-amber-200 bg-amber-50 text-amber-900",
+          ikon: "warn" as const,
+          judul: "Pratinjau import jadwal — menunggu konfirmasi kode",
+          sub: `${h.guruBedaNama?.length ?? 0} baris memakai kode guru dengan nama berbeda di file. Jadwal tetap akan dibuat memakai nama dari data guru — centang konfirmasi di bawah untuk mengizinkan.`,
+        };
+      }
       if (h.siapEksekusi !== true) {
-        const jmlBlokir =
-          (h.guruTidakDitemukan?.length ?? 0) + (h.guruBedaNama?.length ?? 0) + (h.duplikatNama?.length ?? 0) + (h.bentrok ?? 0);
         return {
           cls: "border-rose-200 bg-rose-50 text-rose-900",
           ikon: "err" as const,
           judul: "Pratinjau import jadwal — tidak bisa dieksekusi",
-          sub: jmlBlokir > 0
-            ? `${jmlBlokir} baris menghalangi (guru hilang / kode tabrakan / nama ambigu / bentrok). Tombol Konfirmasi Import dinonaktifkan sampai bersih.`
+          sub: blokirNyata > 0
+            ? `${blokirNyata} baris menghalangi (guru hilang / nama ambigu / bentrok). Tombol Konfirmasi Import dinonaktifkan sampai bersih.`
             : "Ada kesalahan yang menghalangi — tombol Konfirmasi Import dinonaktifkan sampai bersih.",
         };
       }
@@ -236,7 +247,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
   };
   const kondisi = hasil ? kondisiPanel(hasil) : null;
 
-  const submit = async (exec: boolean) => {
+  const submit = async (exec: boolean, konfirmOverride?: boolean) => {
     if (!file) return;
     if (jadwal && !semesterId) {
       setHasil({ ok: false, teks: "Pilih tahun ajaran & periode tujuan terlebih dahulu — jadwal harus masuk ke periode tertentu." });
@@ -250,6 +261,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
       fd.append("tipe", tipe);
       fd.append("file", file);
       if (jadwal) fd.append("semesterId", semesterId);
+      if (jadwal && (konfirmOverride ?? konfirmKode)) fd.append("konfirmasiKodeBedaNama", "1");
       if (!exec) fd.append("preview", "1");
       const r = await fetch("/api/import", { method: "POST", body: fd });
       const d = await r.json();
@@ -270,6 +282,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
     setFile(null);
     setHasil(null);
     setBukaDetail(false);
+    setKonfirmKode(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -415,6 +428,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                 setFile(f);
                 setHasil(null);
                 setBukaDetail(false);
+                setKonfirmKode(false);
               }
             }}
           />
@@ -430,7 +444,11 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
               <button
                 onClick={() => submit(true)}
                 disabled={sibuk || hasil?.siapEksekusi !== true}
-                title={hasil?.siapEksekusi !== true ? "Periksa kembali — masih ada error yang menghalangi import" : undefined}
+                title={
+                  hasil?.siapEksekusi !== true
+                    ? "Periksa kembali — masih ada yang menghalangi import (error, atau centang konfirmasi kode terlebih dahulu)"
+                    : undefined
+                }
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sibuk ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
@@ -513,24 +531,45 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                   </div>
                 )}
 
-                {/* Tabrakan kode: nama di file beda total dari pemilik kode di database */}
+                {/* Kode cocok tapi nama di file beda total dari pemilik kode di database —
+                    jadwal tetap dibuat memakai guru dari kode, butuh konfirmasi admin. */}
                 {!!hasil.guruBedaNama?.length && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2.5 text-rose-900">
-                    <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <div className="text-xs leading-5">
-                      <p>
-                        <b>{hasil.guruBedaNama.length} baris memakai kode guru yang di database dimiliki orang lain.</b>{" "}
-                        Kode adalah kunci sinkron — baris ini <b>tidak akan diimport</b> sampai kode/nama di file diperbaiki.
-                      </p>
-                      <ul className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
-                        {hasil.guruBedaNama.slice(0, 8).map((g, i) => (
-                          <li key={i} className="font-semibold">
-                            Baris {g.barisKe}: {g.nama} ({g.kode}) → DB: {g.namaDb}
-                          </li>
-                        ))}
-                        {hasil.guruBedaNama.length > 8 && <li>… dan {hasil.guruBedaNama.length - 8} lainnya.</li>}
-                      </ul>
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div className="text-xs leading-5">
+                        <p>
+                          <b>{hasil.guruBedaNama.length} baris memakai kode guru yang nama di file-nya beda dari database.</b>{" "}
+                          Jadwal tetap akan dibuat memakai guru sesuai <b>Kode</b> (nama diambil dari data guru) — nama di
+                          file diabaikan. Pastikan Kode di file <b>bukan typo</b>, karena jadwal akan menempel ke pemilik
+                          kode berikut:
+                        </p>
+                        <ul className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
+                          {hasil.guruBedaNama.slice(0, 8).map((g, i) => (
+                            <li key={i} className="font-semibold">
+                              Baris {g.barisKe}: "{g.nama}" ({g.kode}) → dipakai: {g.namaDb}
+                            </li>
+                          ))}
+                          {hasil.guruBedaNama.length > 8 && <li>… dan {hasil.guruBedaNama.length - 8} lainnya.</li>}
+                        </ul>
+                      </div>
                     </div>
+                    {hasil.preview && (
+                      <label className="mt-2.5 flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-white/70 px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={konfirmKode}
+                          onChange={(e) => {
+                            setKonfirmKode(e.target.checked);
+                            if (jadwal && hasilPreview) void submit(false, e.target.checked);
+                          }}
+                          className="mt-0.5 h-4 w-4 accent-amber-600"
+                        />
+                        <span className="text-xs font-semibold leading-5 text-amber-900">
+                          Saya yakin KODE di file sudah benar — buat jadwal memakai nama guru dari data guru sesuai kode.
+                        </span>
+                      </label>
+                    )}
                   </div>
                 )}
 

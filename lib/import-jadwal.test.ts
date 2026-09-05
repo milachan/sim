@@ -166,22 +166,43 @@ describe("TAHAP 3B.5-B — Import Jadwal selaras master Guru (fungsi produksi)",
 });
 
 describe("TAHAP 3B.5-C — Tabrakan data Guru vs Jadwal", () => {
-  test("Kode mengarah ke guru dengan nama BEDA TOTAL → diblokir (guruBedaNama), bukan sekadar catatan", async () => {
+  test("Kode mengarah ke guru dengan nama BEDA TOTAL → jadwal tetap masuk memakai nama data guru, tapi butuh konfirmasi (guruBedaNama)", async () => {
     const f = fakePrisma({ gurus: [{ id: "g-siti", nama: "Siti Aminah, S.Pd.", kode: "K5" }] });
     const rows = [["Budi Santoso (K5)", "Senin", "4", "9:15 - 9:55", "IPS", "IX F"]];
     const plan = await importJadwalBaru(rows, SEMESTER, "gabung", "preview", { prismaClient: f.client as never });
     assert.equal(plan.guruBedaNama.length, 1);
     assert.equal(plan.guruBedaNama[0].namaDb, "Siti Aminah, S.Pd.");
     assert.equal(plan.guruCatatan.length, 0);
-    assert.equal(plan.jadwalBaru, 0);
+    assert.equal(plan.perluKonfirmasiKode, true);
+    // Jadwal tetap direncanakan — memakai guru pemilik kode (nama dari data guru).
+    assert.equal(plan.jadwalBaru, 1);
+    // Tanpa konfirmasi → belum bisa dieksekusi, tapi bukan error (tidak diblokir).
     assert.equal(plan.siapEksekusi, false);
-    assert.ok(plan.error.some((e) => e.includes("K5") && e.includes("Siti Aminah")));
+    assert.ok(!plan.error.some((e) => e.includes("K5")));
 
-    // Eksekusi juga tidak boleh menulis apa pun.
+    // Preview dengan konfirmasi → siap dieksekusi.
+    const fKonf = fakePrisma({ gurus: [{ id: "g-siti", nama: "Siti Aminah, S.Pd.", kode: "K5" }] });
+    const planKonf = await importJadwalBaru(rows, SEMESTER, "gabung", "preview", {
+      prismaClient: fKonf.client as never,
+      konfirmasiKodeBedaNama: true,
+    });
+    assert.equal(planKonf.siapEksekusi, true);
+
+    // Eksekusi TANPA konfirmasi → tidak menulis apa pun.
     const f2 = fakePrisma({ gurus: [{ id: "g-siti", nama: "Siti Aminah, S.Pd.", kode: "K5" }] });
     const exec = await importJadwalBaru(rows, SEMESTER, "gabung", "exec", { prismaClient: f2.client as never });
     assert.equal(exec.siapEksekusi, false);
     assert.equal(f2.calls.length, 0);
+
+    // Eksekusi DENGAN konfirmasi → jadwal ditulis memakai guru dari kode.
+    const f3 = fakePrisma({ gurus: [{ id: "g-siti", nama: "Siti Aminah, S.Pd.", kode: "K5" }] });
+    const execKonf = await importJadwalBaru(rows, SEMESTER, "gabung", "exec", {
+      prismaClient: f3.client as never,
+      konfirmasiKodeBedaNama: true,
+    });
+    assert.equal(execKonf.siapEksekusi, true);
+    assert.equal(execKonf.jadwalBaru, 1);
+    assert.ok(f3.calls.some((c) => c.model === "jadwal" && c.aksi === "create"));
   });
 
   test("Nama beda format tapi mirip (mis. tanpa gelar) → tetap diproses, hanya catatan info", async () => {

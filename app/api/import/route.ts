@@ -257,7 +257,8 @@ export async function POST(req: NextRequest) {
         rows,
         { id: semester.id, nama: `${semester.nama} (${semester.tahunAjaran.nama})` },
         format,
-        preview ? "preview" : "exec"
+        preview ? "preview" : "exec",
+        { konfirmasiKodeBedaNama: form.get("konfirmasiKodeBedaNama") === "1" }
       );
       return NextResponse.json({ ok: true, tipe: "jadwal", ...hasil });
     }
