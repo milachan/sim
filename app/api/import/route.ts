@@ -232,6 +232,9 @@ export async function POST(req: NextRequest) {
         ok: true,
         tipe: "siswa",
         preview,
+        // Preview siswa selalu siap dieksekusi selama ada baris yang bisa diproses
+        // (ok:true) — baris tidak valid memang dilewati & dicatat, bukan blocker.
+        siapEksekusi: preview ? true : undefined,
         ...hasil,
         teks:
           hasil.baru.length === 0 && hasil.update.length === 0 && hasil.konflik.length === 0 && hasil.sama > 0
