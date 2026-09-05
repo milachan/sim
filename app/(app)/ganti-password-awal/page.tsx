@@ -29,8 +29,16 @@ export default function GantiPasswordAwalPage() {
     try {
       await gantiPasswordAwal({ passwordBaru: password });
       setSukses(true);
-      router.refresh();
-      router.push("/");
+      // JWT lama masih membawa penanda "wajib ganti password". Logout bersih
+      // lalu arahkan ke halaman masuk agar sesi baru valid dan tidak terjebak
+      // di halaman ini (middleware akan memblokir halaman lain selama penanda
+      // lama masih ada di cookie).
+      setTimeout(() => {
+        signOut({ redirect: false }).finally(() => {
+          router.replace("/login");
+          router.refresh();
+        });
+      }, 1200);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal mengganti password.");
     } finally {
@@ -43,7 +51,9 @@ export default function GantiPasswordAwalPage() {
       <div className="fade-up mx-auto max-w-md pt-10">
         <Card className="card-pad text-center">
           <p className="text-lg font-extrabold text-emerald-700">Password berhasil diganti</p>
-          <p className="mt-2 text-sm text-slate-500">Sekarang Anda dapat memakai aplikasi seperti biasa.</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Silakan masuk kembali dengan password baru. Mengarahkan ke halaman masuk…
+          </p>
         </Card>
       </div>
     );
