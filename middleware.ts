@@ -31,6 +31,25 @@ export default withAuth(
   function middleware(req) {
     const pathname = req.nextUrl.pathname;
 
+    /*
+     * OpenLiteSpeed (LSWS) menggandakan header Origin saat reverse-proxy, sehingga
+     * backend menerima nilai seperti "https://a.b, https://a.b". Node.js
+     * menggabungkan dua header sama dengan ", " dan new URL() di handler server
+     * action Next.js melempar ERR_INVALID_URL → SEMUA server action gagal
+     * dieksekusi (mutasi seperti ganti password tidak pernah tersimpan).
+     * Normalisasi: ambil nilai pertama (nilai lain adalah duplikat proxy).
+     */
+    const headers = new Headers(req.headers);
+    const origin = headers.get("origin");
+    if (origin && origin.includes(",")) {
+      const pertama = origin.split(",")[0].trim();
+      if (pertama) headers.set("origin", pertama);
+    }
+    const fwdHost = headers.get("x-forwarded-host");
+    if (fwdHost && fwdHost.includes(",")) {
+      headers.set("x-forwarded-host", fwdHost.split(",")[0].trim());
+    }
+
     // Rate limit hanya untuk percobaan verifikasi (ada param kode).
     if (pathname === "/verifikasi-dokumen" && req.nextUrl.searchParams.has("kode")) {
       const sekarang = Date.now();
@@ -55,7 +74,7 @@ export default withAuth(
     // dihitung ulang dari database di server (layout, halaman, server action,
     // dan API route) agar perubahan peran/status akun berlaku segera.
     // Role di dalam JWT memang hanya sebagai penunjuk sesi, bukan sumber otoritas.
-    return NextResponse.next();
+    return NextResponse.next({ request: { headers } });
   },
   {
     pages: { signIn: "/login" },
