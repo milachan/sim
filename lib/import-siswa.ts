@@ -14,8 +14,8 @@ export type ItemSiswaUpdate = {
   kelasBaru: string;
   dipulihkan: boolean;
 };
-// Nama cocok dengan siswa yang sudah ada, tapi NISN-nya beda → butuh konfirmasi
-// untuk memperbarui/replace data lama (NISN file dianggap yang benar).
+// Nama cocok dengan siswa yang sudah ada, tapi NISN/NIS-nya beda → butuh konfirmasi
+// admin; siswa DITAMBAHKAN sebagai siswa baru (bukan replace data lama).
 export type ItemSiswaKonflik = {
   nisnFile: string;
   nisFile: string;
@@ -36,6 +36,43 @@ export type RencanaSiswa = {
   sama: number;
   dilewati: number;
   error: string[];
+};
+
+export type SiswaImportPrisma = {
+  kelas: { findMany: (args?: unknown) => Promise<{ id: string; nama: string }[]> };
+  siswa: {
+    findMany: (args?: unknown) => Promise<
+      {
+        id: string;
+        nama: string;
+        nisn: string | null;
+        nis: string | null;
+        jenisKelamin: "L" | "P" | null;
+        kelasId: string | null;
+        deletedAt: Date | null;
+      }[]
+    >;
+    create: (args: {
+      data: {
+        nama: string;
+        nisn: string | null;
+        nis: string | null;
+        jenisKelamin: "L" | "P" | null;
+        kelasId: string | null;
+        status: string;
+        deletedAt: null;
+      };
+    }) => Promise<{
+      id: string;
+      nama: string;
+      nisn: string | null;
+      nis: string | null;
+      jenisKelamin: "L" | "P" | null;
+      kelasId: string | null;
+      deletedAt: Date | null;
+    }>;
+    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<unknown>;
+  };
 };
 
 function norm(s: string): string {
@@ -83,13 +120,18 @@ export function bacaJenisKelamin(v: string): { nilai: "L" | "P" | null } | { err
  * Proses file import Data Siswa (format NISN | NIS | NAMA | KELAS, header fleksibel).
  * KUNCI sinkron = NISN (10 digit):
  *   - NISN cocok  → perbarui siswa yang ada (kolom kosong dipertahankan).
- *   - NISN beda tapi NAMA sama → masuk daftar KONFLIK: butuh konfirmasi admin untuk
- *     memperbarui/replace data lama (NISN file dianggap yang benar).
+ *   - NISN/NIS beda tapi NAMA sama → masuk daftar KONFLIK (butuh konfirmasi admin):
+ *     siswa DITAMBAHKAN sebagai siswa baru — NISN beda berarti orang berbeda, walau senama.
  *   - NISN/NIS & nama belum ada → siswa baru.
  *   - Siswa nonaktif yang cocok otomatis dipulihkan.
  * Mode "preview" tidak menulis apa pun ke database.
  */
-export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): Promise<RencanaSiswa> {
+export async function prosesSiswa(
+  bytes: Uint8Array,
+  mode: "preview" | "exec",
+  deps?: { prismaClient?: SiswaImportPrisma }
+): Promise<RencanaSiswa> {
+  const db = (deps?.prismaClient ?? (prisma as unknown as SiswaImportPrisma));
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(bytes as unknown as ExcelJS.Buffer);
   const ws = wb.worksheets[0];
@@ -113,8 +155,8 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
   const plan: RencanaSiswa = { baru: [], update: [], konflik: [], sama: 0, dilewati: 0, error: [] };
 
   const [kelasDb, siswaDb] = await Promise.all([
-    prisma.kelas.findMany(),
-    prisma.siswa.findMany({ select: { id: true, nama: true, nisn: true, nis: true, jenisKelamin: true, kelasId: true, deletedAt: true } }),
+    db.kelas.findMany(),
+    db.siswa.findMany({ select: { id: true, nama: true, nisn: true, nis: true, jenisKelamin: true, kelasId: true, deletedAt: true } }),
   ]);
   const byKelas = new Map(kelasDb.map((k) => [norm(k.nama), k]));
   const byNisn = new Map<string, (typeof siswaDb)[number]>();
@@ -210,7 +252,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
         dipulihkan,
       });
       if (mode === "exec") {
-        await prisma.siswa.update({
+        await db.siswa.update({
           where: { id: ada.id },
           data: {
             nama,
@@ -227,9 +269,19 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
       continue;
     }
 
-    // ---------- Kunci tidak cocok → cek nama (konflik butuh konfirmasi) ----------
+    // ---------- Kunci tidak cocok → cek nama (nama sama = siswa baru, butuh konfirmasi) ----------
     const adaNama = byNama.get(norm(nama));
     if (adaNama) {
+      // NISN/NIS beda tapi nama sama: orang yang berbeda bisa senama. Jangan
+      // replace data orang yang salah — DITAMBAHKAN sebagai siswa baru, dengan
+      // konfirmasi admin (terlihat di pratinjau sebagai "nama sama").
+      if (!nisn && !nis) {
+        plan.error.push(
+          `Baris "${label}": nama "${nama}" sama dengan siswa yang sudah ada (${adaNama.nama}${adaNama.nisn ? `, NISN ${adaNama.nisn}` : ""}) tapi NISN/NIS kosong — isi NISN di file agar siswa baru bisa ditambahkan.`
+        );
+        plan.dilewati++;
+        continue;
+      }
       plan.konflik.push({
         nisnFile: nisn,
         nisFile: nis,
@@ -243,23 +295,21 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
         kelasLama: namaKelas(adaNama.kelasId),
       });
       if (mode === "exec") {
-        // Replace: NISN/NIS file dianggap yang benar, siswa lama diperbarui
-        await prisma.siswa.update({
-          where: { id: adaNama.id },
+        // Tambah sebagai siswa BARU — NISN beda berarti orang berbeda, walau senama.
+        const created = await db.siswa.create({
           data: {
             nama,
-            ...(nisn ? { nisn } : {}),
-            ...(nis ? { nis } : {}),
-            ...(jk.nilai ? { jenisKelamin: jk.nilai } : {}),
-            ...(kelas ? { kelasId: kelas.id } : {}),
+            nisn: nisn || null,
+            nis: nis || null,
+            jenisKelamin: jk.nilai,
+            kelasId: kelas?.id ?? null,
             status: "AKTIF",
             deletedAt: null,
           },
         });
-        if (nisn) {
-          byNisn.set(nisn, { ...adaNama, nama, nisn });
-          if (adaNama.nisn) byNisn.delete(adaNama.nisn);
-        }
+        byNama.set(norm(nama), created);
+        if (created.nisn) byNisn.set(created.nisn, created);
+        if (created.nis) byNis.set(created.nis, created);
       }
       if (nisn && !fileNisn.has(nisn)) fileNisn.add(nisn);
       if (nis && !fileNis.has(nis)) fileNis.add(nis);
@@ -276,7 +326,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
     if (nisn) fileNisn.add(nisn);
     if (nis) fileNis.add(nis);
     if (mode === "exec") {
-      const created = await prisma.siswa.create({
+      const created = await db.siswa.create({
         data: {
           nama,
           nisn: nisn || null,

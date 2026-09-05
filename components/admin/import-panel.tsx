@@ -166,8 +166,8 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
           return {
             cls: "border-amber-200 bg-amber-50 text-amber-900",
             ikon: "warn" as const,
-            judul: `Pratinjau import siswa — ${jml} konflik nama`,
-            sub: "Mengonfirmasi import akan memperbarui/replace data lama sesuai NISN di file. Baris lain tetap diproses.",
+            judul: `Pratinjau import siswa — ${jml} nama sama dengan data existing`,
+            sub: "Siswa dengan NISN berbeda akan DITAMBAHKAN sebagai siswa baru (bukan mengganti data lama). Konfirmasi untuk menyimpan; baris lain tetap diproses.",
           };
         return {
           cls: "border-emerald-200 bg-emerald-50 text-emerald-900",
@@ -291,7 +291,7 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
       const b: string[] = [];
       if (h.baru?.length) b.push(`${h.baru.length} siswa baru`);
       if (h.update?.length) b.push(`${h.update.length} diperbarui`);
-      if (h.konflik?.length) b.push(`${h.konflik.length} konflik nama`);
+      if (h.konflik?.length) b.push(`${h.konflik.length} nama sama → baru`);
       if (h.sama) b.push(`${h.sama} sama`);
       if (h.dilewati) b.push(`${h.dilewati} dilewati`);
       return b.join(" · ") || "tidak ada perubahan";
@@ -666,16 +666,18 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                       )}
                       {!!hasil.konflik?.length && (
                         <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-orange-700">Konflik nama — akan di-replace</p>
+                          <p className="text-xs font-bold uppercase tracking-wide text-orange-700">Nama sama — akan ditambahkan sebagai siswa baru</p>
                           <div className="mt-1 max-h-56 space-y-1.5 overflow-y-auto">
                             {hasil.konflik.map((k, i) => (
                               <div key={i} className="rounded-lg bg-white/70 px-3 py-2 text-xs leading-5">
                                 <p className="font-bold text-slate-800">
-                                  {k.namaFile} <span className="text-slate-500">(NISN {k.nisnFile || "-"})</span>
+                                  {k.namaFile}{" "}
+                                  <span className="text-slate-500">(NISN baru {k.nisnFile || "-"} · NIS {k.nisFile || "-"})</span>
                                 </p>
                                 <p className="text-slate-500">
-                                  Menggantikan {k.namaLama} — NISN lama {k.nisnLama} · NIS {k.nisLama}
-                                  {k.jkFile || k.jkLama ? ` · JK: ${k.jkLama || "-"} → ${k.jkFile || "(tetap)"}` : ""} · Kelas {k.kelasLama} → {k.kelasFile || "(tetap)"}
+                                  Nama sama dengan {k.namaLama} (NISN {k.nisnLama || "-"} · kelas {k.kelasLama}) — akan dibuat
+                                  siswa BARU{k.kelasFile ? ` di kelas ${k.kelasFile}` : ""}
+                                  {k.jkFile ? ` · JK ${k.jkFile}` : ""}.
                                 </p>
                               </div>
                             ))}
@@ -802,8 +804,8 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                 </li>
                 <li>Kelas harus sudah dibuat di menu Kelas & Rombel (nama harus persis, mis. 7A).</li>
                 <li>
-                  NISN berbeda tapi <b>nama sama</b> dengan data yang ada = <b>konflik</b> — perlu konfirmasi untuk
-                  memperbarui/replace data lama. Hasil selalu diperiksa dulu (pratinjau) sebelum disimpan.
+                  NISN berbeda tapi <b>nama sama</b> dengan data yang ada = <b>ditambahkan sebagai siswa baru</b> (bukan
+                  replace) — perlu konfirmasi di pratinjau. Hasil selalu diperiksa dulu (pratinjau) sebelum disimpan.
                 </li>
                 <li>Baris dengan data tidak valid akan dilewati dan dicatat di laporan hasil import.</li>
               </>
