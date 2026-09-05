@@ -4,6 +4,11 @@ import LoginForm, { type AkunDemo } from "@/components/login-form";
 
 export const dynamic = "force-dynamic";
 
+// Kotak "Akun demo" di halaman login HANYA muncul bila diaktifkan eksplisit
+// lewat DEMO_LOGIN=1 (untuk pengembangan lokal). Di produksi tetap tersembunyi
+// walau akun seed masih ada di database.
+const DEMO_LOGIN = process.env.DEMO_LOGIN === "1";
+
 // Akun demo (hasil seed) yang ditampilkan di halaman login — urut sesuai daftar ini.
 const USERNAME_DEMO = ["guru1", "guru2", "guru3", "piket", "waka", "admin", "kamad", "superadmin"] as const;
 
@@ -24,7 +29,7 @@ async function muatAkunDemo(): Promise<AkunDemo[]> {
 }
 
 export default async function LoginPage() {
-  const demo = await muatAkunDemo();
+  const demo = DEMO_LOGIN ? await muatAkunDemo() : [];
   return (
     <Suspense>
       <LoginForm demo={demo} />
