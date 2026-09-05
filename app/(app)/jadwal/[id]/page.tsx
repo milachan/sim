@@ -7,7 +7,8 @@ import { Card, EmptyState, InfoRow, PageHeader } from "@/components/ui";
 import { PertemuanBadge } from "@/components/status-badge";
 import { sinkronkanPertemuan } from "@/lib/pertemuan";
 import { formatTanggal, mulaiHari } from "@/lib/utils";
-import { apakahJamUpacara, HARI_LABEL, rentangJam, SUMBER_PERTEMUAN_LABEL } from "@/lib/constants";
+import { apakahJamUpacara, HARI_LABEL, SUMBER_PERTEMUAN_LABEL } from "@/lib/constants";
+import { rentangJamCerdas } from "@/lib/jam-utils";
 import { UpacaraBadge } from "@/components/status-badge";
 import { bolehBacaJadwal, bolehKelolaJadwal } from "@/lib/otorisasi";
 
@@ -60,7 +61,7 @@ export default async function DetailJadwal({
   });
   const hariIniAda = pertemuanList.some((p) => p.tanggal.getTime() === hariIni.getTime());
 
-  const rentangJadwal = rentangJam(jadwal.hari, jadwal.jamKeMulai, jadwal.jamKeSelesai);
+  const rentangJadwal = await rentangJamCerdas(jadwal.hari, jadwal.jamKeMulai, jadwal.jamKeSelesai);
 
   const kegiatan = await prisma.penilaianKegiatan.findMany({
     where: { jadwalId: jadwal.id },

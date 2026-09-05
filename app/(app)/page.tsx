@@ -10,11 +10,11 @@ import { detailKelengkapanAbsensiHarian, hariDariTanggal } from "@/lib/absensi-h
 import {
   jamKeBerjalan,
   jamPembukaHari,
-  rentangJam,
   STATUS_ABSENSI_HARIAN_BADGE,
   STATUS_ABSENSI_HARIAN_LABEL,
   type StatusAbsensiHarian,
 } from "@/lib/constants";
+import { rentangJamCerdas } from "@/lib/jam-utils";
 import { cariSemesterAktif } from "@/lib/semester";
 import InfoWaktu from "@/components/info-waktu";
 import JadwalHariIniBeranda, { type ItemJadwalBeranda } from "@/components/jadwal-hari-ini-beranda";
@@ -98,6 +98,17 @@ export default async function Beranda({ searchParams }: { searchParams: { sukses
   // Gerbang jurnal: untuk kelas yang guru ini pegang jam pertamanya hari ini, bila
   // absensi harian kelas belum lengkap, baris di "Jadwal Hari Ini" harus mengarahkan
   // ke pengisian absensi kelas dulu — baru boleh masuk ke halaman pengisian jurnal.
+  // Rentang waktu "Jam pertama" tiap kelas — dari DB (pengaturan jam pelajaran)
+  // dengan fallback template, dihitung sekali untuk seluruh daftar.
+  const rentangJamPertamaByKelas = new Map<string, string | null>(
+    await Promise.all(
+      kelasJamPertamaSaya.map(async (j) => [
+        j.kelasId,
+        await rentangJamCerdas(j.hari, j.jamKeMulai, j.jamKeSelesai),
+      ] as [string, string | null])
+    )
+  );
+
   const kelasJamPertamaIds = kelasJamPertamaSaya.map((j) => j.kelasId);
   const hasilKelengkapanAbsensi = await Promise.all(
     kelasJamPertamaIds.map(async (kelasId) => ({
@@ -118,25 +129,27 @@ export default async function Beranda({ searchParams }: { searchParams: { sukses
   })();
 
   // Data polos kartu "Jadwal Hari Ini" — aman dikirim ke komponen client (live).
-  const jadwalHariIniItems: ItemJadwalBeranda[] = pertemuanHariIni.map((p) => {
-    const jadwal = p.jadwal!;
-    return {
-      id: p.id,
-      href: `/pertemuan/${p.id}`,
-      hari: jadwal.hari,
-      mapel: jadwal.mapel.nama,
-      kelas: jadwal.kelas.nama,
-      kelasId: jadwal.kelasId,
-      jamKeMulai: jadwal.jamKeMulai,
-      jamKeSelesai: jadwal.jamKeSelesai,
-      rentang: rentangJam(jadwal.hari, jadwal.jamKeMulai, jadwal.jamKeSelesai),
-      pertemuanKe: p.pertemuanKe,
-      status: p.status,
-      // Bila guru jam pertama kelas ini belum melengkapi absensi harian, baris ini
-      // menjadi gerbang: klik → isi absensi kelas dulu (belum bisa ke halaman jurnal).
-      wajibAbsenDulu: absensiJamPertamaBelumLengkap.has(jadwal.kelasId),
-    };
-  });
+  const jadwalHariIniItems: ItemJadwalBeranda[] = await Promise.all(
+    pertemuanHariIni.map(async (p) => {
+      const jadwal = p.jadwal!;
+      return {
+        id: p.id,
+        href: `/pertemuan/${p.id}`,
+        hari: jadwal.hari,
+        mapel: jadwal.mapel.nama,
+        kelas: jadwal.kelas.nama,
+        kelasId: jadwal.kelasId,
+        jamKeMulai: jadwal.jamKeMulai,
+        jamKeSelesai: jadwal.jamKeSelesai,
+        rentang: (await rentangJamCerdas(jadwal.hari, jadwal.jamKeMulai, jadwal.jamKeSelesai)) ?? null,
+        pertemuanKe: p.pertemuanKe,
+        status: p.status,
+        // Bila guru jam pertama kelas ini belum melengkapi absensi harian, baris ini
+        // menjadi gerbang: klik → isi absensi kelas dulu (belum bisa ke halaman jurnal).
+        wajibAbsenDulu: absensiJamPertamaBelumLengkap.has(jadwal.kelasId),
+      };
+    })
+  );
 
   // Kartu "Perlu Dilengkapi" dikelompokkan per tanggal; maksimal 7 hari terbaru.
   const MAX_HARI_PERLU = 7;
@@ -204,7 +217,7 @@ export default async function Beranda({ searchParams }: { searchParams: { sukses
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-bold text-slate-900 group-hover:text-blue-700">{j.kelas.nama}</p>
                       <p className="break-words text-xs text-slate-500">
-                        Jam pertama: {j.mapel.nama} · {rentangJam(j.hari, j.jamKeMulai, j.jamKeSelesai) ?? `Jam ${j.jamKeMulai}`}
+                        Jam pertama: {j.mapel.nama} · {rentangJamPertamaByKelas.get(j.kelasId) ?? `Jam ${j.jamKeMulai}`}
                       </p>
                     </div>
                   </div>

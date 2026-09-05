@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { JAM_PELAJARAN, JAM_MAKS } from "@/lib/constants";
+import { JAM_PELAJARAN, JAM_MAKS, rentangJam } from "@/lib/constants";
 import type { Hari } from "@prisma/client";
 
 let cache: { items: { hari: Hari; jamKe: number; mulai: string; selesai: string }[]; ts: number } | null = null;
@@ -32,6 +32,18 @@ export async function rentangJamFromDb(hari: Hari, mulai: number, selesai: numbe
   const b = await waktuJamFromDb(hari, selesai);
   if (!a || !b) return null;
   return `${a.mulai}–${b.selesai}`;
+}
+
+/**
+ * Rentang waktu untuk tampilan: ambil dari DB (pengaturan jam pelajaran) lebih dulu;
+ * bila belum diatur di DB (tabel kosong / jam belum terdefinisi), fallback ke
+ * template hardcoded JAM_PELAJARAN. Dengan begitu tampilan selalu mengikuti
+ * pengaturan admin begitu tabel JamPelajaran diisi, dan tetap waras saat kosong.
+ */
+export async function rentangJamCerdas(hari: Hari, mulai: number, selesai: number): Promise<string | null> {
+  const dariDb = await rentangJamFromDb(hari, mulai, selesai);
+  if (dariDb) return dariDb;
+  return rentangJam(hari, mulai, selesai);
 }
 
 /** List seluruh jam pelajaran dari DB sebagai fallback. Dipakai oleh admin/jam-pelajaran

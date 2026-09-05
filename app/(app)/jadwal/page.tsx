@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { cariSemesterAktif } from "@/lib/semester";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { SelectNavigasi } from "@/components/select-navigasi";
-import { apakahJamUpacara, HARI, HARI_LABEL, rentangJam } from "@/lib/constants";
+import { apakahJamUpacara, HARI, HARI_LABEL } from "@/lib/constants";
+import { rentangJamCerdas } from "@/lib/jam-utils";
 import { UpacaraBadge } from "@/components/status-badge";
 import { MatriksJadwal, type BarisMatriksJadwal } from "@/components/jadwal/matriks-jadwal";
 import { cn, mulaiHari } from "@/lib/utils";
@@ -48,9 +49,18 @@ export default async function JadwalPage({
     const hariHariIni = hariDariTanggal(new Date());
     const hariIniIndex = hariHariIni ? HARI.indexOf(hariHariIni) : 6; // Senin=0, Minggu=6 (minggu berikutnya)
 
+    // Rentang waktu tiap jadwal diambil dari DB (pengaturan jam pelajaran) dengan
+    // fallback template — sekali untuk seluruh daftar, bukan per baris saat render.
+    const jadwalDenganRentang = await Promise.all(
+      jadwal.map(async (j) => ({
+        ...j,
+        rentang: (await rentangJamCerdas(j.hari, j.jamKeMulai, j.jamKeSelesai)) ?? `jam ke-${j.jamKeMulai}`,
+      }))
+    );
+
     const byHari = HARI.map((h) => ({
       hari: h,
-      list: jadwal.filter((j) => j.hari === h),
+      list: jadwalDenganRentang.filter((j) => j.hari === h),
       tanggal: addDays(hariIni, (HARI.indexOf(h) - hariIniIndex + 7) % 7),
     }));
 
@@ -102,7 +112,7 @@ export default async function JadwalPage({
                           </p>
                           <p className="truncate text-xs text-slate-500">
                             {j.kelas.nama}
-                            {` · ${rentangJam(j.hari, j.jamKeMulai, j.jamKeSelesai) ?? `jam ke-${j.jamKeMulai}`}`}
+                            {` · ${j.rentang}`}
                           </p>
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 group-hover:text-emerald-500" />

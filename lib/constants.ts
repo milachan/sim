@@ -15,11 +15,10 @@ export const HARI_LABEL: Record<string, string> = {
  * Format waktu konsisten "HH:mm" (24 jam) — sama dengan kolom JamPelajaran di DB.
  *
  * JAM_PELAJARAN adalah nested map: HARI → jamKe → { mulai, selesai }.
- * - BIASA: Senin–Sabtu (Jumat pakai JUMAT).
- * - JUMAT: hanya 6 jam (1–6) untuk waktu ibadah Jumat.
+ * - BIASA: Senin–Sabtu — waktu yang sama untuk semua hari (termasuk Jumat),
+ *   sesuai jadwal resmi sekolah (aSc Timetables): 9 jam, 06:50/07:15–14:00.
  * - Durasi 1 jam ≈ 40 menit. Ada jeda istirahat di antara blok.
  *
- * Hari khusus (Jumat) terpisah karena waktu mengajar lebih pendek.
  * Konstanta ini dipakai sebagai:
  *   1. Default di admin/jam-pelajaran saat DB kosong.
  *   2. Fallback server-side bila DB tidak tersedia / rusak.
@@ -72,12 +71,15 @@ export const JAM_PELAJARAN: Record<Hari, Record<number, { mulai: string; selesai
     9: { mulai: "13:20", selesai: "14:00" },
   },
   JUMAT: {
-    1: { mulai: "06:50", selesai: "07:25" },
-    2: { mulai: "07:25", selesai: "08:05" },
-    3: { mulai: "08:05", selesai: "08:45" },
-    4: { mulai: "08:45", selesai: "09:25" },
-    5: { mulai: "09:40", selesai: "10:20" },
-    6: { mulai: "10:20", selesai: "11:00" },
+    1: { mulai: "07:15", selesai: "07:55" },
+    2: { mulai: "07:55", selesai: "08:35" },
+    3: { mulai: "08:35", selesai: "09:15" },
+    4: { mulai: "09:15", selesai: "09:55" },
+    5: { mulai: "10:10", selesai: "10:50" },
+    6: { mulai: "10:50", selesai: "11:30" },
+    7: { mulai: "11:30", selesai: "12:10" },
+    8: { mulai: "12:40", selesai: "13:20" },
+    9: { mulai: "13:20", selesai: "14:00" },
   },
   SABTU: {
     1: { mulai: "07:15", selesai: "07:55" },

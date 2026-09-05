@@ -8,7 +8,8 @@ import { PertemuanBadge } from "@/components/status-badge";
 import PertemuanShell from "@/components/pertemuan/pertemuan-shell";
 import type { ItemRiwayatJurnal } from "@/components/pertemuan/types";
 import { formatTanggalPanjang } from "@/lib/utils";
-import { apakahJamUpacara, rentangJam } from "@/lib/constants";
+import { apakahJamUpacara } from "@/lib/constants";
+import { rentangJamCerdas } from "@/lib/jam-utils";
 import { UpacaraBadge } from "@/components/status-badge";
 
 import { bolehBacaPertemuan, bolehKelolaPertemuan } from "@/lib/otorisasi";
@@ -60,6 +61,10 @@ export default async function PertemuanPage({
   const kelas = pertemuan.kelas ?? pertemuan.jadwal?.kelas;
   const mapel = pertemuan.mapel ?? pertemuan.jadwal?.mapel;
   const guru = pertemuan.jadwal?.guru;
+
+  const rentangPertemuan = pertemuan.jadwal
+    ? await rentangJamCerdas(pertemuan.jadwal.hari, pertemuan.jadwal.jamKeMulai, pertemuan.jadwal.jamKeSelesai)
+    : null;
 
   const siswa = await prisma.siswa.findMany({
     where: { kelasId: kelas?.id, status: "AKTIF", deletedAt: null },
@@ -213,9 +218,7 @@ export default async function PertemuanPage({
                     <span className="break-words">
                       jam ke-{pertemuan.jadwal.jamKeMulai}
                       {pertemuan.jadwal.jamKeSelesai > pertemuan.jadwal.jamKeMulai ? `–${pertemuan.jadwal.jamKeSelesai}` : ""}
-                      {rentangJam(pertemuan.jadwal.hari, pertemuan.jadwal.jamKeMulai, pertemuan.jadwal.jamKeSelesai)
-                        ? ` (${rentangJam(pertemuan.jadwal.hari, pertemuan.jadwal.jamKeMulai, pertemuan.jadwal.jamKeSelesai)})`
-                        : ""}
+                      {rentangPertemuan ? ` (${rentangPertemuan})` : ""}
                     </span>
                     {apakahJamUpacara(pertemuan.jadwal.hari, pertemuan.jadwal.jamKeMulai) && <UpacaraBadge />}
                   </p>

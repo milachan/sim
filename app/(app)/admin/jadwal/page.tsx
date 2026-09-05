@@ -8,7 +8,8 @@ import { SelectNavigasi } from "@/components/select-navigasi";
 import { PilihJam } from "@/components/pilih-jam";
 import { TabelJadwalAdmin, type BarisJadwalAdmin } from "@/components/admin/tabel-jadwal-admin";
 import { SalinJadwal, type OpsiSemester } from "@/components/admin/salin-jadwal";
-import { apakahJamUpacara, HARI, HARI_LABEL, rentangJam } from "@/lib/constants";
+import { apakahJamUpacara, HARI, HARI_LABEL } from "@/lib/constants";
+import { rentangJamCerdas } from "@/lib/jam-utils";
 import { cariSemesterAktif } from "@/lib/semester";
 
 export const dynamic = "force-dynamic";
@@ -94,19 +95,21 @@ export default async function AdminJadwalPage({
   ]);
   const edit = searchParams.edit ? jadwalList.find((j) => j.id === searchParams.edit) : null;
 
-  const baris: BarisJadwalAdmin[] = jadwalList.map((j) => ({
-    id: j.id,
-    semester: `${j.semester.nama} ${j.semester.tahunAjaran.nama}`,
-    hariLabel: HARI_LABEL[j.hari],
-    jamKeMulai: j.jamKeMulai,
-    jamKeSelesai: j.jamKeSelesai,
-    rentang: rentangJam(j.hari, j.jamKeMulai, j.jamKeSelesai),
-    mapel: j.mapel.nama,
-    kelas: j.kelas.nama,
-    guru: j.guru.nama.split(",")[0],
-    punyaRiwayat: j._count.pertemuan > 0 || j._count.kegiatan > 0,
-    upacara: apakahJamUpacara(j.hari, j.jamKeMulai),
-  }));
+  const baris: BarisJadwalAdmin[] = await Promise.all(
+    jadwalList.map(async (j) => ({
+      id: j.id,
+      semester: `${j.semester.nama} ${j.semester.tahunAjaran.nama}`,
+      hariLabel: HARI_LABEL[j.hari],
+      jamKeMulai: j.jamKeMulai,
+      jamKeSelesai: j.jamKeSelesai,
+      rentang: await rentangJamCerdas(j.hari, j.jamKeMulai, j.jamKeSelesai),
+      mapel: j.mapel.nama,
+      kelas: j.kelas.nama,
+      guru: j.guru.nama.split(",")[0],
+      punyaRiwayat: j._count.pertemuan > 0 || j._count.kegiatan > 0,
+      upacara: apakahJamUpacara(j.hari, j.jamKeMulai),
+    }))
+  );
 
   const opsiSemester: OpsiSemester[] = semesterList.map((s) => ({
     id: s.id,

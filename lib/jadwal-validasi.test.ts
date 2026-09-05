@@ -123,6 +123,35 @@ test("cache jam: invalidateJamCache wajib dipanggil setelah data jam berubah (re
   }
 });
 
+test("rentangJamCerdas: pakai DB bila ada, fallback template bila kosong", async () => {
+  const { rentangJamCerdas } = await import("./jam-utils");
+  const { prisma } = await import("./prisma");
+  const origFindMany = prisma.jamPelajaran.findMany;
+  try {
+    // DB kosong → fallback template constants (Jumat jam 4 = 09:15–09:55 sesuai file asli).
+    (prisma.jamPelajaran.findMany as unknown as () => Promise<never[]>) = async () => [] as never[];
+    const { invalidateJamCache } = await import("./jam-utils");
+    invalidateJamCache();
+    assert.equal(await rentangJamCerdas("JUMAT", 4, 4), "09:15–09:55");
+    assert.equal(await rentangJamCerdas("SENIN", 2, 3), "07:55–09:15");
+
+    // DB terisi → data DB yang dipakai (bukan template).
+    const barisDb = ([
+      { hari: "JUMAT", jamKe: 4, mulai: "09:00", selesai: "09:45" },
+      { hari: "SENIN", jamKe: 2, mulai: "08:00", selesai: "08:40" },
+      { hari: "SENIN", jamKe: 3, mulai: "08:40", selesai: "09:20" },
+    ] as unknown[]) as never[];
+    (prisma.jamPelajaran.findMany as unknown as () => Promise<never[]>) = async () => barisDb;
+    invalidateJamCache();
+    assert.equal(await rentangJamCerdas("JUMAT", 4, 4), "09:00–09:45");
+    assert.equal(await rentangJamCerdas("SENIN", 2, 3), "08:00–09:20");
+  } finally {
+    prisma.jamPelajaran.findMany = origFindMany;
+    const { invalidateJamCache } = await import("./jam-utils");
+    invalidateJamCache();
+  }
+});
+
 test("hari tak dikenal ditolak validasi (guard runtime, bukan hanya tipe)", async () => {
   const { validasiJadwal } = await import("./jadwal-validasi");
   const input = {
