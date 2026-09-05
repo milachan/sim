@@ -1,13 +1,15 @@
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 
-export type ItemSiswaBaru = { nisn: string; nis: string; nama: string; kelas: string };
+export type ItemSiswaBaru = { nisn: string; nis: string; nama: string; jk: "L" | "P" | null; kelas: string };
 export type ItemSiswaUpdate = {
   nisn: string;
   namaLama: string;
   namaBaru: string;
   nisLama: string;
   nisBaru: string;
+  jkLama: string;
+  jkBaru: string;
   kelasLama: string;
   kelasBaru: string;
   dipulihkan: boolean;
@@ -18,10 +20,12 @@ export type ItemSiswaKonflik = {
   nisnFile: string;
   nisFile: string;
   namaFile: string;
+  jkFile: string;
   kelasFile: string;
   nisnLama: string;
   nisLama: string;
   namaLama: string;
+  jkLama: string;
   kelasLama: string;
 };
 
@@ -38,7 +42,7 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function cariKolom(header: string[]): { nisn: number; nis: number; nama: number; kelas: number } {
+export function cariKolom(header: string[]): { nisn: number; nis: number; nama: number; jk: number; kelas: number } {
   const idx: Record<string, number> = {};
   header.forEach((h, i) => {
     const n = norm(h);
@@ -48,8 +52,31 @@ function cariKolom(header: string[]): { nisn: number; nis: number; nama: number;
   const nisn = idx["nisn"] ?? header.findIndex((h) => norm(h).includes("nisn"));
   const nis = idx["nis"] ?? idx["nisinduk"] ?? header.findIndex((h) => norm(h).includes("nis") && !norm(h).includes("nisn"));
   const nama = idx["nama"] ?? idx["namalengkap"] ?? header.findIndex((h) => norm(h).includes("nama"));
+  // Jenis kelamin: JENIS KELAMIN / JK / KELAMIN / GENDER (opsional)
+  const jk =
+    idx["jeniskelamin"] ??
+    idx["jk"] ??
+    idx["kelamin"] ??
+    idx["gender"] ??
+    header.findIndex((h) => {
+      const n = norm(h);
+      return n.includes("jeniskelamin") || n === "jk" || n.includes("kelamin") || n.includes("gender");
+    });
   const kelas = idx["kelas"] ?? idx["rombonganbelajar"] ?? header.findIndex((h) => norm(h).includes("kelas") || norm(h).includes("rombel"));
-  return { nisn, nis, nama, kelas };
+  return { nisn, nis, nama, jk, kelas };
+}
+
+/**
+ * Normalisasi jenis kelamin dari isi sel Excel. Mengembalikan:
+ * - { nilai: "L" | "P" | null } — null bila sel kosong (opsional).
+ * - { error: string } — nilai tidak dikenal.
+ */
+export function bacaJenisKelamin(v: string): { nilai: "L" | "P" | null } | { error: string } {
+  const n = v.trim().toLowerCase().replace(/[^a-z]/g, "");
+  if (!n) return { nilai: null };
+  if (n === "l" || n === "lakilaki" || n === "lk" || n === "pria" || n === "laki") return { nilai: "L" };
+  if (n === "p" || n === "perempuan" || n === "pr" || n === "wanita" || n === "cewek") return { nilai: "P" };
+  return { error: `Jenis kelamin "${v}" tidak dikenal (gunakan L/P atau Laki-laki/Perempuan).` };
 }
 
 /**
@@ -87,7 +114,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
 
   const [kelasDb, siswaDb] = await Promise.all([
     prisma.kelas.findMany(),
-    prisma.siswa.findMany({ select: { id: true, nama: true, nisn: true, nis: true, kelasId: true, deletedAt: true } }),
+    prisma.siswa.findMany({ select: { id: true, nama: true, nisn: true, nis: true, jenisKelamin: true, kelasId: true, deletedAt: true } }),
   ]);
   const byKelas = new Map(kelasDb.map((k) => [norm(k.nama), k]));
   const byNisn = new Map<string, (typeof siswaDb)[number]>();
@@ -110,11 +137,17 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
     const nisn = get(cells, kol.nisn);
     const nis = get(cells, kol.nis);
     const nama = get(cells, kol.nama);
+    const jk = bacaJenisKelamin(get(cells, kol.jk));
     const kelasNama = get(cells, kol.kelas);
     const label = `${nama}${nisn ? ` (${nisn})` : nis ? ` (NIS ${nis})` : ""}`.trim() || `baris ${rows.indexOf(cells) + 2}`;
 
     if (!nama) {
       plan.error.push(`Baris "${label}": NAMA wajib diisi.`);
+      plan.dilewati++;
+      continue;
+    }
+    if ("error" in jk) {
+      plan.error.push(`Baris "${label}": ${jk.error}`);
       plan.dilewati++;
       continue;
     }
@@ -156,10 +189,11 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
       const namaBerubah = nama !== ada.nama;
       const nisBerubah = nis && nis !== (ada.nis ?? "") ? nis : null;
       const nisnBerubah = nisn && nisn !== (ada.nisn ?? "") ? nisn : null;
+      const jkBerubah = jk.nilai && jk.nilai !== ada.jenisKelamin ? jk.nilai : null;
       const kelasBerubah = kelas ? kelas.id !== ada.kelasId : false;
       const dipulihkan = !!ada.deletedAt;
 
-      if (!namaBerubah && !nisBerubah && !nisnBerubah && !kelasBerubah && !dipulihkan) {
+      if (!namaBerubah && !nisBerubah && !nisnBerubah && !jkBerubah && !kelasBerubah && !dipulihkan) {
         plan.sama++;
         continue;
       }
@@ -169,6 +203,8 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
         namaBaru: nama,
         nisLama: ada.nis ?? "-",
         nisBaru: nis || "(tetap)",
+        jkLama: ada.jenisKelamin ?? "-",
+        jkBaru: jk.nilai ?? "(tetap)",
         kelasLama: namaKelas(ada.kelasId),
         kelasBaru: kelas ? kelas.nama : "(tetap)",
         dipulihkan,
@@ -180,6 +216,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
             nama,
             ...(nisn ? { nisn } : {}),
             ...(nis ? { nis } : {}),
+            ...(jk.nilai ? { jenisKelamin: jk.nilai } : {}),
             ...(kelas ? { kelasId: kelas.id } : {}),
             status: "AKTIF",
             deletedAt: null,
@@ -197,10 +234,12 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
         nisnFile: nisn,
         nisFile: nis,
         namaFile: nama,
+        jkFile: jk.nilai ?? "",
         kelasFile: kelas?.nama ?? "",
         nisnLama: adaNama.nisn ?? "-",
         nisLama: adaNama.nis ?? "-",
         namaLama: adaNama.nama,
+        jkLama: adaNama.jenisKelamin ?? "",
         kelasLama: namaKelas(adaNama.kelasId),
       });
       if (mode === "exec") {
@@ -211,6 +250,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
             nama,
             ...(nisn ? { nisn } : {}),
             ...(nis ? { nis } : {}),
+            ...(jk.nilai ? { jenisKelamin: jk.nilai } : {}),
             ...(kelas ? { kelasId: kelas.id } : {}),
             status: "AKTIF",
             deletedAt: null,
@@ -232,7 +272,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
       plan.dilewati++;
       continue;
     }
-    plan.baru.push({ nisn, nis, nama, kelas: kelas?.nama ?? "" });
+    plan.baru.push({ nisn, nis, nama, jk: jk.nilai, kelas: kelas?.nama ?? "" });
     if (nisn) fileNisn.add(nisn);
     if (nis) fileNis.add(nis);
     if (mode === "exec") {
@@ -241,6 +281,7 @@ export async function prosesSiswa(bytes: Uint8Array, mode: "preview" | "exec"): 
           nama,
           nisn: nisn || null,
           nis: nis || null,
+          jenisKelamin: jk.nilai,
           kelasId: kelas?.id ?? null,
           status: "AKTIF",
           deletedAt: null,

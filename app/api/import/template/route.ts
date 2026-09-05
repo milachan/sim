@@ -26,13 +26,14 @@ export async function GET(req: NextRequest) {
       { header: "NISN", key: "nisn", width: 14 },
       { header: "NIS", key: "nis", width: 14 },
       { header: "NAMA", key: "nama", width: 34 },
+      { header: "JENIS KELAMIN", key: "jenisKelamin", width: 14 },
       { header: "KELAS", key: "kelas", width: 10 },
     ];
     ws.getRow(1).eachCell((c) => { c.style = HEAD; });
-    ws.addRow({ nisn: "3000000001", nis: "24001", nama: "Ahmad Pratama", kelas: "7A" }).eachCell((c) => { c.style = CONTOH; });
-    ws.addRow({ nisn: "3000000002", nis: "24002", nama: "Aisyah Ramadhan", kelas: "7A" }).eachCell((c) => { c.style = CONTOH; });
+    ws.addRow({ nisn: "3000000001", nis: "24001", nama: "Ahmad Pratama", jenisKelamin: "L", kelas: "7A" }).eachCell((c) => { c.style = CONTOH; });
+    ws.addRow({ nisn: "3000000002", nis: "24002", nama: "Aisyah Ramadhan", jenisKelamin: "P", kelas: "7A" }).eachCell((c) => { c.style = CONTOH; });
     const catatan = ws.addRow([]);
-    catatan.getCell(1).value = "Petunjuk: NISN (10 digit) adalah KUNCI sinkron — siswa dengan NISN sama akan diperbarui. NIS dan KELAS opsional. Baris contoh bisa dihapus.";
+    catatan.getCell(1).value = "Petunjuk: NISN (10 digit) adalah KUNCI sinkron — siswa dengan NISN sama akan diperbarui. NIS, JENIS KELAMIN, dan KELAS opsional (JENIS KELAMIN: L / P / Laki-laki / Perempuan). Baris contoh bisa dihapus.";
     catatan.getCell(1).font = { italic: true, color: { argb: "FF94A3B8" } };
 
     const petunjuk = wb.addWorksheet("Petunjuk");
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
       ["1. Isi sheet 'Data Siswa' — satu baris = satu siswa."],
       ["2. Kolom NISN (10 digit angka) adalah KUNCI sinkron. Siswa dengan NISN yang sama akan diperbarui; yang belum ada akan dibuat."],
       ["3. NIS & KELAS opsional. KELAS harus sudah ada di menu Kelas & Rombel (nama harus persis, mis. 7A); sel kosong berarti mempertahankan kelas yang sudah terdata."],
+      ["3b. JENIS KELAMIN opsional — isi L / P (atau Laki-laki / Perempuan). Kosong = mempertahankan data lama; nilai selain itu akan dicatat sebagai baris tidak valid."],
       ["4. Bila NISN berbeda tapi NAMA sama dengan siswa yang sudah ada, muncul peringatan konflik — periksa dulu di pratinjau, lalu konfirmasi untuk memperbarui/replace data lama."],
       ["5. Sebelum disimpan ada pratinjau (siswa baru / diperbarui / konflik) — periksa lalu konfirmasi. Siswa yang nonaktif dipulihkan otomatis."],
     ];

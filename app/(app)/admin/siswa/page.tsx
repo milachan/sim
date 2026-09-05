@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, ErrorBanner, PageHeader, SuksesBanner, TableRow, TableShell, Td, Th } from "@/components/ui";
 import { formHapusSiswa, formPulihkanSiswa, formSiswa } from "@/lib/actions/admin-forms";
 import { TombolHapus } from "@/components/tombol-hapus";
-import { STATUS_SISWA_LABEL } from "@/lib/constants";
+import { JENIS_KELAMIN_LABEL, STATUS_SISWA_LABEL } from "@/lib/constants";
 import type { StatusSiswa } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +132,14 @@ export default async function AdminSiswaPage({
             <input className="input" name="nis" defaultValue={edit?.nis ?? ""} />
           </div>
           <div>
+            <label className="label">Jenis Kelamin</label>
+            <select className="input" name="jenisKelamin" defaultValue={edit?.jenisKelamin ?? ""}>
+              <option value="">— belum diisi —</option>
+              <option value="L">Laki-laki</option>
+              <option value="P">Perempuan</option>
+            </select>
+          </div>
+          <div>
             <label className="label">Kelas</label>
             <select className="input" name="kelasId" defaultValue={edit?.kelasId ?? kelas ?? ""}>
               <option value="">— tanpa kelas —</option>
@@ -164,6 +172,7 @@ export default async function AdminSiswaPage({
             <Th>Nama</Th>
             <Th>NISN</Th>
             <Th>NIS</Th>
+            <Th>JK</Th>
             <Th>Kelas</Th>
             <Th>Wali Kelas</Th>
             <Th>No. Wali Kelas</Th>
@@ -177,6 +186,7 @@ export default async function AdminSiswaPage({
               <Td className="font-bold text-slate-900">{s.nama}</Td>
               <Td className="font-mono text-xs">{s.nisn ?? "-"}</Td>
               <Td>{s.nis ?? "-"}</Td>
+              <Td>{s.jenisKelamin ? JENIS_KELAMIN_LABEL[s.jenisKelamin] : "-"}</Td>
               <Td>{s.kelas?.nama ?? "-"}</Td>
               <Td>{s.kelas?.waliKelas?.nama ?? "-"}</Td>
               <Td className="whitespace-nowrap">{s.kelas?.waliKelas?.telepon ?? "-"}</Td>

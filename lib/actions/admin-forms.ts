@@ -76,6 +76,7 @@ export async function formSiswa(formData: FormData) {
         nama: (formData.get("nama") as string) ?? "",
         nisn: (formData.get("nisn") as string) ?? "",
         nis: (formData.get("nis") as string) ?? "",
+        jenisKelamin: ((formData.get("jenisKelamin") as string) || null) as "L" | "P" | null,
         kelasId: (formData.get("kelasId") as string) ?? "",
         status: (formData.get("status") as "AKTIF") ?? "AKTIF",
       }),

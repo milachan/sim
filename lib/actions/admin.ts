@@ -94,6 +94,7 @@ export async function simpanSiswa(input: {
   nama: string;
   nisn: string;
   nis: string;
+  jenisKelamin: "L" | "P" | null;
   kelasId: string;
   status: "AKTIF" | "ALUMNI" | "KELUAR";
 }) {
@@ -105,6 +106,7 @@ export async function simpanSiswa(input: {
     nama: input.nama.trim(),
     nisn,
     nis: input.nis?.trim() || null,
+    jenisKelamin: input.jenisKelamin ?? null,
     kelasId: input.kelasId || null,
     status: input.status,
     deletedAt: null,

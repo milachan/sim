@@ -14,6 +14,7 @@ import {
   UploadCloud,
   XCircle,
 } from "lucide-react";
+import { JENIS_KELAMIN_LABEL } from "@/lib/constants";
 
 type SemesterOption = {
   id: string;
@@ -32,13 +33,15 @@ type TahunAjaranOption = {
 };
 
 // Item hasil import siswa (NISN kunci sinkron)
-type SiswaBaru = { nisn: string; nis: string; nama: string; kelas: string };
+type SiswaBaru = { nisn: string; nis: string; nama: string; jk: "L" | "P" | null; kelas: string };
 type SiswaUpdate = {
   nisn: string;
   namaLama: string;
   namaBaru: string;
   nisLama: string;
   nisBaru: string;
+  jkLama: string;
+  jkBaru: string;
   kelasLama: string;
   kelasBaru: string;
   dipulihkan: boolean;
@@ -47,10 +50,12 @@ type SiswaKonflik = {
   nisnFile: string;
   nisFile: string;
   namaFile: string;
+  jkFile: string;
   kelasFile: string;
   nisnLama: string;
   nisLama: string;
   namaLama: string;
+  jkLama: string;
   kelasLama: string;
 };
 
@@ -88,7 +93,7 @@ type Hasil = {
 const TIPE = {
   siswa: {
     label: "Import Siswa",
-    desc: "Tambah/perbarui siswa massal — kolom NISN, NIS, NAMA, KELAS. Kunci sinkron = NISN.",
+    desc: "Tambah/perbarui siswa massal — kolom NISN, NIS, NAMA, JENIS KELAMIN, KELAS. Kunci sinkron = NISN.",
     template: "/api/import/template?t=siswa",
   },
   jadwal: {
@@ -596,7 +601,9 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                       {!!hasil.baru?.length && (
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Siswa baru (akan dibuat)</p>
-                          {chips(hasil.baru.map((b) => `${b.nama}${b.nisn ? ` (${b.nisn})` : ""}${b.kelas ? ` · ${b.kelas}` : ""}`))}
+                          {chips(
+                            hasil.baru.map((b) => `${b.nama}${b.nisn ? ` (${b.nisn})` : ""}${b.jk ? ` · ${JENIS_KELAMIN_LABEL[b.jk]}` : ""}${b.kelas ? ` · ${b.kelas}` : ""}`)
+                          )}
                         </div>
                       )}
                       {!!hasil.update?.length && (
@@ -610,7 +617,8 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                                   {u.dipulihkan && <span className="chip ml-1.5 bg-amber-100 text-amber-700">dipulihkan</span>}
                                 </p>
                                 <p className="text-slate-500">
-                                  NIS: {u.nisLama} → {u.nisBaru} · Kelas: {u.kelasLama} → {u.kelasBaru}
+                                  NIS: {u.nisLama} → {u.nisBaru}
+                                  {u.jkLama !== "-" || u.jkBaru !== "(tetap)" ? ` · JK: ${u.jkLama} → ${u.jkBaru}` : ""} · Kelas: {u.kelasLama} → {u.kelasBaru}
                                 </p>
                               </div>
                             ))}
@@ -627,7 +635,8 @@ export function ImportPanel({ tahunAjaran }: { tahunAjaran: TahunAjaranOption[] 
                                   {k.namaFile} <span className="text-slate-500">(NISN {k.nisnFile || "-"})</span>
                                 </p>
                                 <p className="text-slate-500">
-                                  Menggantikan {k.namaLama} — NISN lama {k.nisnLama} · NIS {k.nisLama} · Kelas {k.kelasLama} → {k.kelasFile || "(tetap)"}
+                                  Menggantikan {k.namaLama} — NISN lama {k.nisnLama} · NIS {k.nisLama}
+                                  {k.jkFile || k.jkLama ? ` · JK: ${k.jkLama || "-"} → ${k.jkFile || "(tetap)"}` : ""} · Kelas {k.kelasLama} → {k.kelasFile || "(tetap)"}
                                 </p>
                               </div>
                             ))}

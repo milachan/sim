@@ -26,6 +26,11 @@ enum StatusSiswa {
   KELUAR
 }
 
+enum JenisKelamin {
+  L
+  P
+}
+
 enum Hari {
   SENIN
   SELASA
@@ -196,6 +201,7 @@ model Siswa {
   // sebagai identitas lokal; NISN menjadi patokan pencocokan saat upload Excel.
   nisn          String?             @unique
   nis           String?             @unique
+  jenisKelamin  JenisKelamin?
   kelasId       String?
   kelas         Kelas?              @relation(fields: [kelasId], references: [id], onDelete: SetNull)
   status        StatusSiswa         @default(AKTIF)

@@ -304,6 +304,11 @@ export const STATUS_SISWA_LABEL = {
   KELUAR: "Keluar",
 } as const;
 
+export const JENIS_KELAMIN_LABEL = {
+  L: "Laki-laki",
+  P: "Perempuan",
+} as const;
+
 export const MAPEL_KODE: Record<string, string> = {
   "Al-Qur'an Hadits": "AQH",
   "Akidah Akhlaq": "AKA",
